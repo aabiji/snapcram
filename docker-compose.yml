@@ -1,0 +1,14 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend:/snapcram
+    develop:
+      watch:
+        - action: restart
+          target: /snapcram
+          path: ./backend
