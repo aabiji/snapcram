@@ -21,4 +21,6 @@ Run the backend
 cd path/to/snapcram/backend
 docker compose up --build --watch # enable hot reloading
 # `docker compose down` to delete the container
+
+# TODO: get a groq api key
 ```

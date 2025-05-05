@@ -12,3 +12,7 @@ services:
         - action: restart
           target: /snapcram
           path: ./backend
+
+secrets:
+  groq_api_key:
+    file: secrets/groq_api_key.txt
