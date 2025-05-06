@@ -20,15 +20,7 @@ TODO: set up api endpoint to create flashcards
 	  research different anki prompts
 	  can we force the model to a output formatted response
 	  refactor
-*/
-
-/*
-func rootEndpoint(w http.ResponseWriter, req *http.Request) {
-	response := map[string]string{ "message": "hello world" }
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
-}
+	  start designing frontend
 */
 
 type ImageUrl struct {
@@ -82,16 +74,15 @@ func readText(path string) (string, error) {
 	return string(data), nil
 }
 
-func main() {
-	//http.HandleFunc("/", rootEndpoint)
-	//http.ListenAndServe(":8080", nil)
-
+func demo() {
 	// base64 encode an image
 	imageBytes, err := readFile("image.jpeg")
 	if err != nil {
 		panic(err)
 	}
 
+	// TODO: load the image from a url instead
+	// we'll get the url after we upload the file to firebase
 	base64Image := &strings.Builder{}
 	encoder := base64.NewEncoder(base64.StdEncoding, base64Image)
 	encoder.Write(imageBytes)
@@ -176,4 +167,56 @@ func main() {
 	for _, r := range potentialResponses {
 		fmt.Println(r)
 	}
+}
+
+func writeJson(w http.ResponseWriter, object any) error {
+	w.Header().Set("Content-Type", "application/json")
+	return json.NewEncoder(w).Encode(object)
+}
+
+func handleError(w http.ResponseWriter, statusCode int) {
+	message := ""
+	if statusCode == http.StatusNotFound {
+		message = "Page not found!"
+	} else if statusCode == http.StatusInternalServerError {
+		message = "Internal server error"
+	} else if statusCode == http.StatusBadRequest {
+		message = "Invalid request"
+	}
+
+	w.WriteHeader(statusCode)
+	writeJson(w, map[string]string{"error": message})
+}
+
+func rootEndpoint(w http.ResponseWriter, req *http.Request) {
+	if req.URL.Path != "/" {
+		handleError(w, http.StatusNotFound)
+		return
+	}
+
+	response := map[string]string{ "message": "hello world 123" }
+	writeJson(w, response)
+}
+
+type UploadRequest struct {
+	FileUrl string `json:"file_url"`
+}
+
+func uploadEndpoint(w http.ResponseWriter, req *http.Request) {
+	var data UploadRequest
+	err := json.NewDecoder(req.Body).Decode(&data)
+	if err != nil {
+		handleError(w, http.StatusBadRequest)
+		return
+	}
+
+	response := map[string]string{ "message": "hello world 123" }
+	writeJson(w, response)
+}
+
+func main() {
+	http.HandleFunc("/", rootEndpoint)
+	http.HandleFunc("/upload", uploadEndpoint)
+	fmt.Println("Serving the backend on port 8080")
+	http.ListenAndServe(":8080", nil)
 }
