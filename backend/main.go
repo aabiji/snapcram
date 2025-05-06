@@ -5,22 +5,31 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
+	"slices"
+	"strings"
 )
 
 /*
-TODO: set up api endpoint to create flashcards
-	  the api endpoint should allow image uploads
+TODO: upload images from the frontend
 	  if there are attached files, convert to base64 (remove readFile function)
-	  validate the images so that they fit the constraints that groq emposes
-	  https://console.groq.com/docs/vision
+	  convert to base64 when reading files
 	  research different anki prompts
 	  can we force the model to a output formatted response
 	  refactor
 	  start designing frontend
+*/
+
+/*
+TONIGHT:
+	refactor file reading/writing into files.go	
+	have a promptLLM() function
+	validate the images so that they fit the constraints that groq emposes
+	https://console.groq.com/docs/vision
+	integrate with sqlite db (just get a basic demo working)
 */
 
 type ImageUrl struct {
@@ -66,14 +75,6 @@ func readFile(path string) ([]byte, error) {
 	return buffer, nil
 }
 
-func readText(path string) (string, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return "", err
-	}
-	return string(data), nil
-}
-
 func demo() {
 	// base64 encode an image
 	imageBytes, err := readFile("image.jpeg")
@@ -81,13 +82,13 @@ func demo() {
 		panic(err)
 	}
 
-	// TODO: load the image from a url instead
-	// we'll get the url after we upload the file to firebase
+	// TODO: should have readBase64 in files.go
 	base64Image := &strings.Builder{}
 	encoder := base64.NewEncoder(base64.StdEncoding, base64Image)
 	encoder.Write(imageBytes)
 	encoder.Close()
 
+	// TODO: set the actual file mimetype
 	imageStr := fmt.Sprintf("data:image/jpeg;base64,%s", base64Image.String())
 
 	prompt := "What is the image?"
@@ -169,12 +170,18 @@ func demo() {
 	}
 }
 
-func writeJson(w http.ResponseWriter, object any) error {
-	w.Header().Set("Content-Type", "application/json")
-	return json.NewEncoder(w).Encode(object)
+func writeFile(path string, data []byte) error {
+	folder := filepath.Dir(path)
+	if folder != "." {
+		os.MkdirAll(folder, 0644)
+	}
+	return os.WriteFile(path, data, 0644)
 }
 
-func handleError(w http.ResponseWriter, statusCode int) {
+func handleResponse(w http.ResponseWriter, statusCode int, object any) {
+	w.WriteHeader(statusCode)
+	w.Header().Set("Content-Type", "application/json")
+
 	message := ""
 	if statusCode == http.StatusNotFound {
 		message = "Page not found!"
@@ -184,39 +191,89 @@ func handleError(w http.ResponseWriter, statusCode int) {
 		message = "Invalid request"
 	}
 
-	w.WriteHeader(statusCode)
-	writeJson(w, map[string]string{"error": message})
+	if statusCode != http.StatusOK {
+		response := map[string]any{
+			"error": message, "details": object,
+		}
+		json.NewEncoder(w).Encode(response)
+	} else {
+		json.NewEncoder(w).Encode(object)
+	}
 }
 
-func rootEndpoint(w http.ResponseWriter, req *http.Request) {
+func handleRoot(w http.ResponseWriter, req *http.Request) {
 	if req.URL.Path != "/" {
-		handleError(w, http.StatusNotFound)
+		handleResponse(w, http.StatusNotFound, nil)
 		return
 	}
 
 	response := map[string]string{ "message": "hello world 123" }
-	writeJson(w, response)
+	handleResponse(w, http.StatusOK, response)
 }
 
-type UploadRequest struct {
-	FileUrl string `json:"file_url"`
-}
+func handleFileUpload(w http.ResponseWriter, req *http.Request) {
+	if req.URL.Path != "/upload" {
+		handleResponse(w, http.StatusNotFound, nil)
+		return
+	}
 
-func uploadEndpoint(w http.ResponseWriter, req *http.Request) {
-	var data UploadRequest
-	err := json.NewDecoder(req.Body).Decode(&data)
+	var memoryCapacity int64 = 32 << 20 // 32 megabytes
+	var fileSizeLimit int64 = 10 << 20 // 10 megabytes
+	allowedMimetypes := []string{"image/png", "image/jpeg"}
+
+	err := req.ParseMultipartForm(memoryCapacity)
 	if err != nil {
-		handleError(w, http.StatusBadRequest)
+		handleResponse(w, http.StatusBadRequest, "Failed to parse form")
 		return
 	}
 
-	response := map[string]string{ "message": "hello world 123" }
-	writeJson(w, response)
+	fileHeaders, ok := req.MultipartForm.File["file"]
+	if !ok || len(fileHeaders) == 0 {
+		handleResponse(w, http.StatusBadRequest, "No attached files")
+		return
+	}
+
+	for _, header := range fileHeaders {
+		if header.Size > fileSizeLimit {
+			msg := fmt.Sprintf("%s: too big", header.Filename)
+			handleResponse(w, http.StatusBadRequest, msg)
+			return
+		}
+
+		mimetype := header.Header.Get("Content-Type")
+		if !slices.Contains(allowedMimetypes, mimetype) {
+			msg := fmt.Sprintf("%s: invalid file type", header.Filename)
+			handleResponse(w, http.StatusBadRequest, msg)
+			return
+		}
+
+		file, err := header.Open()
+		if err != nil {
+			handleResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
+
+		buffer := make([]byte, header.Size)
+		if _, err := file.Read(buffer); err != nil {
+			handleResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
+		file.Close()
+
+		path := filepath.Join(".", "images", header.Filename)
+		if err := writeFile(path, buffer); err != nil {
+			handleResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
+	}
+
+	response := map[string]string{"message": "Files uploaded successfully!"}
+	handleResponse(w, http.StatusOK, response)
 }
 
 func main() {
-	http.HandleFunc("/", rootEndpoint)
-	http.HandleFunc("/upload", uploadEndpoint)
+	http.HandleFunc("/", handleRoot)
+	http.HandleFunc("/upload", handleFileUpload)
 	fmt.Println("Serving the backend on port 8080")
 	http.ListenAndServe(":8080", nil)
 }
