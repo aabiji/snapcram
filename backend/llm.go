@@ -34,7 +34,7 @@ type Payload struct {
 }
 
 // Use the Groq api to prompt an LLM and return the potential LLM outputs
-func promptGroqLLM(payload Payload, apiKey) ([]string, error) {
+func promptGroqLLM(payload Payload, apiKey string) ([]string, error) {
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
