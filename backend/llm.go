@@ -17,20 +17,20 @@ type ImageUrl struct {
 // Base64 image data should be <= 4 MB
 // Images should have a 33 megapixel resolution limit
 type Prompt struct {
-	Type		string		`json:"type,omitempty"`
-	Text		string		`json:"text,omitempty"`
-	ImageUrl	*ImageUrl	`json:"image_url,omitempty"`
+	Type     string    `json:"type,omitempty"`
+	Text     string    `json:"text,omitempty"`
+	ImageUrl *ImageUrl `json:"image_url,omitempty"`
 }
 
 type Message struct {
-	Role		string		`json:"role"`
-	Content		[]Prompt	`json:"content"`
+	Role    string   `json:"role"`
+	Content []Prompt `json:"content"`
 }
 
 type Payload struct {
-	Model		string		`json:"model"`
-	UserId		string		`json:"user"`
-	Messages	[]Message	`json:"messages"`
+	Model    string    `json:"model"`
+	UserId   string    `json:"user"`
+	Messages []Message `json:"messages"`
 }
 
 // Use the Groq api to prompt an LLM and return the potential LLM outputs

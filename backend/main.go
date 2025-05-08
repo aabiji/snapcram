@@ -4,8 +4,8 @@ import (
 	//"database/sql"
 	"encoding/json"
 	"fmt"
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/golang-jwt/jwt/v5"
+	_ "github.com/mattn/go-sqlite3"
 	"net/http"
 	//"os"
 	"path/filepath"
@@ -13,84 +13,96 @@ import (
 	"time"
 )
 
+/*
+TODO:
+- createToken()
+- validateToken()
+- getUserId(token): return error if the userId not in db
+- POST /createUser
+- POST /createTopic
+- POST /createDeck
+- POST /generateFlashcards
+- GET /getUserData
+- add jwt secret to docker secrets
+- read docker secret file
+- call endpoints from frontend
+*/
+
 func test() {
 	/*
-	os.Remove("./test.db")
+		os.Remove("./test.db")
 
-	db, err := sql.Open("sqlite3", "test.db")
-	if err != nil {
-		panic(err)
-	}
-	defer db.Close()
+		db, err := sql.Open("sqlite3", "test.db")
+		if err != nil {
+			panic(err)
+		}
+		defer db.Close()
 
-	rawSQL := `
-		create table Users (ID integer not null primary key);
-		create table Topics (
-			ID integer not null primary key,
-			UserID integer not null, Name text not null
-		);
-		create table Decks (
-			ID integer not null primary key,
-			SessionID integer not null, Name text not null
-		);
-		create table Flashcards (
-			ID integer not null primary key,
-			DeckID integer not null,
-			Prompt text not null, Answer text not null
-		);`
-	_, err = db.Exec(rawSQL)
-	if err != nil {
-		panic(err)
-	}
+		rawSQL := `
+			create table Users (ID integer not null primary key);
+			create table Topics (
+				ID integer not null primary key,
+				UserID integer not null, Name text not null
+			);
+			create table Decks (
+				ID integer not null primary key,
+				SessionID integer not null, Name text not null
+			);
+			create table Flashcards (
+				ID integer not null primary key,
+				DeckID integer not null,
+				Prompt text not null, Answer text not null
+			);`
+		_, err = db.Exec(rawSQL)
+		if err != nil {
+			panic(err)
+		}
 	*/
 	/*
-	"create table Users (ID integer not null primary key)"
-	"insert into Users (ID) values (?)"
-	"select * from Users where ID = ?"
+		"insert into Users (ID) values (?)"
+		"select * from Users where ID = ?"
 
-	"insert into Topics (ID, UserID, Name) values (?, ?, ?)"
-	"select * from Topics where UserID = ?"
+		"insert into Topics (ID, UserID, Name) values (?, ?, ?)"
+		"select * from Topics where UserID = ?"
 
-	"insert into Decks (ID, SessionID, Name) values (?, ?, ?)"
-	"select * from Decks where SessionID = ?"
+		"insert into Decks (ID, SessionID, Name) values (?, ?, ?)"
+		"select * from Decks where SessionID = ?"
 
-	"insert into Flashcards (ID, DeckID, Prompt, Answer) values (?, ?, ?, ?)"
-	"select * from Flashcards where DeckID = ?"
+		"insert into Flashcards (ID, DeckID, Prompt, Answer) values (?, ?, ?, ?)"
+		"select * from Flashcards where DeckID = ?"
 	*/
-	/*	
-	secret := []byte("our super duper secret secret")
-	claims := jwt.MapClaims{
-		"sub": 123, // user id
-		"exp":  time.Now().Add(time.Day * 5).Unix(),
-	}
+}
+
+func createToken(secret []byte, userId string, expiry time.Time) (string, error) {
+	claims := jwt.MapClaims{"sub": userId, "exp": expiry}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString(secret)
+	encoded, err := token.SignedString(secret)
 	if err != nil {
-		panic(err)
+		return "", err
+	}
+	return encoded, nil
+}
+
+func parseToken(encodedToken string, secret []byte) (*jwt.Token, error) {
+	token, err := jwt.ParseWithClaims(
+		encodedToken,
+		jwt.MapClaims{},
+		func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			}
+			return secret, nil
+		},
+	)
+
+	if err != nil {
+		return nil, err
 	}
 
-	token, err = jwt.ParseWithClaims(tokenString, jwt.MapClaims{}, func(token *jwt.Token) (interface{}, error) {
-        if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-            return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-        }
-        return []byte(secret), nil
-	})
-    if err != nil {
-        if errors.Is(err, jwt.ErrSignatureInvalid) {
-            return false, fmt.Errorf("invalid signature")
-        }
-        if errors.Is(err, jwt.ErrTokenExpired) {
-            return false, fmt.Errorf("token has expired")
-        }
-        return false, fmt.Errorf("error parsing token: %v", err)
-    }
-    // Check if the token is valid
-    if _, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-        return true, nil
-    }
-	*/
-
-	fmt.Println(tokenString, token, token.Valid(), token.Claims())
+	if _, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		return token, nil // valid token
+	}
+	return nil, fmt.Errorf("invalid token")
 }
 
 /*
@@ -114,7 +126,7 @@ TODO: upload images from the frontend
 					{
 						Type: "text",
 						Text: "What is the image?",
-						ImageUrl: nil,	
+						ImageUrl: nil,
 					},
 					{
 						Type: "image_url",
@@ -161,7 +173,7 @@ func handleFileUpload(w http.ResponseWriter, req *http.Request) {
 	}
 
 	var memoryCapacity int64 = 32 << 20 // 32 megabytes
-	var fileSizeLimit int64 = 10 << 20 // 10 megabytes
+	var fileSizeLimit int64 = 10 << 20  // 10 megabytes
 	allowedMimetypes := []string{"image/png", "image/jpeg"}
 
 	err := req.ParseMultipartForm(memoryCapacity)
@@ -220,16 +232,31 @@ func handleRoot(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	response := map[string]string{ "message": "hello world 123" }
+	response := map[string]string{"message": "hello world 123"}
 	handleResponse(w, http.StatusOK, response)
 }
 
 func main() {
 	/*
-	http.HandleFunc("/", handleRoot)
-	http.HandleFunc("/upload", handleFileUpload)
-	fmt.Println("Serving the backend on port 8080")
-	http.ListenAndServe(":8080", nil)
+		http.HandleFunc("/", handleRoot)
+		http.HandleFunc("/upload", handleFileUpload)
+		fmt.Println("Serving the backend on port 8080")
+		http.ListenAndServe(":8080", nil)
 	*/
-	test()
+
+	// TODO: actually test this!
+	fmt.Println("creating the token")
+	secret := []byte("super secret!")
+	encoded, err := createToken(secret, "123", time.Now().Add(time.Hour * 24 * 5))
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("parsing the token")
+	token, err := parseToken(encoded, secret)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(token.Claims.GetSubject())
 }
