@@ -1,146 +1,38 @@
 package main
 
 import (
-	//"database/sql"
+	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	_ "github.com/mattn/go-sqlite3"
 	"net/http"
-	//"os"
 	"path/filepath"
 	"slices"
-	"time"
 )
 
 /*
 TODO:
-- createToken()
-- validateToken()
-- getUserId(token): return error if the userId not in db
-- POST /createUser
+- implement the frontend
+- read secretes from docker secret files
 - POST /createTopic
 - POST /createDeck
 - POST /generateFlashcards
 - GET /getUserData
-- add jwt secret to docker secrets
-- read docker secret file
 - call endpoints from frontend
 */
 
-func test() {
-	/*
-		os.Remove("./test.db")
-
-		db, err := sql.Open("sqlite3", "test.db")
-		if err != nil {
-			panic(err)
-		}
-		defer db.Close()
-
-		rawSQL := `
-			create table Users (ID integer not null primary key);
-			create table Topics (
-				ID integer not null primary key,
-				UserID integer not null, Name text not null
-			);
-			create table Decks (
-				ID integer not null primary key,
-				SessionID integer not null, Name text not null
-			);
-			create table Flashcards (
-				ID integer not null primary key,
-				DeckID integer not null,
-				Prompt text not null, Answer text not null
-			);`
-		_, err = db.Exec(rawSQL)
-		if err != nil {
-			panic(err)
-		}
-	*/
-	/*
-		"insert into Users (ID) values (?)"
-		"select * from Users where ID = ?"
-
-		"insert into Topics (ID, UserID, Name) values (?, ?, ?)"
-		"select * from Topics where UserID = ?"
-
-		"insert into Decks (ID, SessionID, Name) values (?, ?, ?)"
-		"select * from Decks where SessionID = ?"
-
-		"insert into Flashcards (ID, DeckID, Prompt, Answer) values (?, ?, ?, ?)"
-		"select * from Flashcards where DeckID = ?"
-	*/
-}
-
-func createToken(secret []byte, userId string, expiry time.Time) (string, error) {
-	claims := jwt.MapClaims{"sub": userId, "exp": expiry}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	encoded, err := token.SignedString(secret)
-	if err != nil {
-		return "", err
-	}
-	return encoded, nil
-}
-
-func parseToken(encodedToken string, secret []byte) (*jwt.Token, error) {
-	token, err := jwt.ParseWithClaims(
-		encodedToken,
-		jwt.MapClaims{},
-		func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-			}
-			return secret, nil
-		},
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if _, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		return token, nil // valid token
-	}
-	return nil, fmt.Errorf("invalid token")
-}
-
 /*
-TODO: upload images from the frontend
-	  if there are attached files, convert to base64 (remove readFile function)
-	  convert to base64 when reading files
-	  research different anki prompts
-	  can we force the model to a output formatted response
-	  refactor
-	  start designing frontend
-*/
+	"insert into Users (ID) values (?)"
 
-/*
-	payload := Payload{
-		Model: "meta-llama/llama-4-scout-17b-16e-instruct",
-		UserId: "test-client",
-		Messages: []Message{
-			{
-				Role: "user",
-				Content: []Prompt{
-					{
-						Type: "text",
-						Text: "What is the image?",
-						ImageUrl: nil,
-					},
-					{
-						Type: "image_url",
-						Text: "",
-						ImageUrl: &ImageUrl{
-							Url: base64EncodeFile("moon.jpeg"),
-						},
-					},
-				},
-			},
-		},
-	}
+	"insert into Topics (ID, UserID, Name) values (?, ?, ?)"
+	"select * from Topics where UserID = ?"
 
-	apiKey := os.Getenv("GROQ_API_KEY") // apiKey, err := readText("/run/secrets/groq_api_key")
+	"insert into Decks (ID, SessionID, Name) values (?, ?, ?)"
+	"select * from Decks where SessionID = ?"
+
+	"insert into Flashcards (ID, DeckID, Prompt, Answer) values (?, ?, ?, ?)"
+	"select * from Flashcards where DeckID = ?"
 */
 
 func handleResponse(w http.ResponseWriter, statusCode int, object any) {
@@ -166,7 +58,48 @@ func handleResponse(w http.ResponseWriter, statusCode int, object any) {
 	}
 }
 
-func handleFileUpload(w http.ResponseWriter, req *http.Request) {
+type App struct {
+	db        *sql.DB
+	jwtSecret []byte
+}
+
+// Wrap our method into a HandlerFunc so that we can the
+// handler function can access 'app'
+func (app *App) wrapHandler(
+	method string,
+	fn func(w http.ResponseWriter, r *http.Request)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if len(method) > 0 && r.Method != method {
+			handleResponse(w, http.StatusNotFound, "")
+			return
+		}
+		fn(w, r)
+	}
+}
+
+func (app *App) getUserId(req *http.Request) (string, error) {
+	tokenStr := req.Header.Get("Authorization")
+	token, err := parseToken(tokenStr, app.jwtSecret)
+	if err != nil {
+		fmt.Println(err)
+		return "", fmt.Errorf("Invalid JWT")
+	}
+
+	userId, err := token.Claims.GetSubject()
+	if err != nil {
+		return "", fmt.Errorf("JWT doesn't contain the user's id")
+	}
+
+	query, err := app.db.Prepare("select * from Users where ID = ?")
+	rows, err := query.Query(userId)
+	if !rows.Next() {
+		return "", fmt.Errorf("User doesn't exist")
+	}
+
+	return userId, nil
+}
+
+func (app *App) handleFileUpload(w http.ResponseWriter, req *http.Request) {
 	if req.URL.Path != "/upload" {
 		handleResponse(w, http.StatusNotFound, nil)
 		return
@@ -226,8 +159,8 @@ func handleFileUpload(w http.ResponseWriter, req *http.Request) {
 	handleResponse(w, http.StatusOK, response)
 }
 
-func handleRoot(w http.ResponseWriter, req *http.Request) {
-	if req.URL.Path != "/" {
+func (app *App) handle404(w http.ResponseWriter, req *http.Request) {
+	if req.URL.Path != "/" || req.Method != "GET" {
 		handleResponse(w, http.StatusNotFound, nil)
 		return
 	}
@@ -236,27 +169,73 @@ func handleRoot(w http.ResponseWriter, req *http.Request) {
 	handleResponse(w, http.StatusOK, response)
 }
 
+func (app *App) createUser(w http.ResponseWriter, req *http.Request) {
+	userId := uuid.NewString()
+
+	statement, err := app.db.Prepare("insert into Users (ID) values (?);")
+	if err != nil {
+		handleResponse(w, http.StatusInternalServerError, nil)
+		return
+	}
+
+	_, err = statement.Exec(userId)
+	if err != nil {
+		handleResponse(w, http.StatusInternalServerError, nil)
+		return
+	}
+
+	tokenStr, err := createToken(app.jwtSecret, userId, DEFAULT_EXPIRY)
+	if err != nil {
+		handleResponse(w, http.StatusInternalServerError, nil)
+		return
+	}
+
+	response := map[string]string{"token": tokenStr}
+	handleResponse(w, http.StatusOK, response)
+}
+
+func setupDB(path string) (*sql.DB, error) {
+	db, err := sql.Open("sqlite3", path)
+	if err != nil {
+		return nil, err
+	}
+
+	statement := `
+			create table if not exists Users (ID text not null);
+			create table if not exists Topics (
+				ID integer not null primary key,
+				UserID integer not null, Name text not null
+			);
+			create table if not exists Decks (
+				ID integer not null primary key,
+				SessionID integer not null, Name text not null
+			);
+			create table if not exists Flashcards (
+				ID integer not null primary key,
+				DeckID integer not null,
+				Prompt text not null, Answer text not null
+			);`
+	_, err = db.Exec(statement)
+	if err != nil {
+		return nil, err
+	}
+
+	return db, nil
+}
+
 func main() {
-	/*
-		http.HandleFunc("/", handleRoot)
-		http.HandleFunc("/upload", handleFileUpload)
-		fmt.Println("Serving the backend on port 8080")
-		http.ListenAndServe(":8080", nil)
-	*/
-
-	// TODO: actually test this!
-	fmt.Println("creating the token")
-	secret := []byte("super secret!")
-	encoded, err := createToken(secret, "123", time.Now().Add(time.Hour * 24 * 5))
+	db, err := setupDB("test.db")
 	if err != nil {
 		panic(err)
 	}
+	defer db.Close()
+	app := App{db: db, jwtSecret: []byte("super duper secret!")}
 
-	fmt.Println("parsing the token")
-	token, err := parseToken(encoded, secret)
-	if err != nil {
-		panic(err)
-	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/create-user", app.wrapHandler("POST", app.createUser))
+	mux.HandleFunc("/upload", app.wrapHandler("POST", app.handleFileUpload))
+	mux.HandleFunc("/", app.wrapHandler("", app.handle404))
 
-	fmt.Println(token.Claims.GetSubject())
+	fmt.Println("Listening on port :8080")
+	http.ListenAndServe(":8080", mux)
 }

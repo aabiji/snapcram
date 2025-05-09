@@ -1,39 +1,78 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { Image } from "expo-image";
 
-import { useState, useRef } from "react";
+import * as SecureStore from "expo-secure-store";
+
+import { useEffect, useState, useRef } from "react";
 
 import { Button, Text, View } from "tamagui";
- 
-async function sendRequest(method: string, endpoint: string, payload?: object) {
-  const host = process.env.EXPO_PUBLIC_HOST_ADDRESS;
-  const url = `http://${host}:8080${endpoint}`;
 
-  const response = await fetch(url, {
-    method: method,
-    body: payload ? null : JSON.stringify(payload),
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json"
+interface Request {
+  method: string;
+  endpoint: string;
+  payload?: object;
+  token?: string;
+};
+
+async function sendRequest(request: Request) {
+  try {
+    const host = process.env.EXPO_PUBLIC_HOST_ADDRESS;
+    const url = `http://${host}:8080${request.endpoint}`;
+
+    let headers = { Accept: "application/json", "Content-Type": "application/json" };
+    if (request.token) {
+      headers["Authorization"] = request.token;
     }
-  });
 
-  return await response.json();
+    const response = await fetch(url, {
+      method: request.method, headers,
+      body: request.payload ? JSON.stringify(request.payload) : undefined,
+    });
+
+    return response;
+  } catch (error) {
+    console.log("WTF?", error); 
+   }
+}
+
+async function localStorageSet(key: string, value: string) {
+  await SecureStore.setItemAsync(key, value);
+}
+
+async function localStorageGet(key: string): Promise<string | null> {
+  let result = await SecureStore.getItemAsync(key);
+  return result;
 }
 
 export default function Index() {
-  const demo = async () => {
-    try {
-      const json = await sendRequest("GET", "/");
-      console.log("data", json);
-    } catch (exception) {
-      console.log("whoopsie!", exception);
+  const [token, setToken] = useState("");
+
+  const authenticate = async () => {
+    const jwt = await localStorageGet("jwt");
+    if (jwt != null && jwt.length > 0) {
+      setToken(jwt);
+      return;
+    }
+
+    const response = await sendRequest({ method: "GET", endpoint: "/create-user" });
+    if (response.status == 200) {
+      const json = await response.json();
+      await localStorageSet("jwt", json["token"])
+      setToken(json["token"]);
     }
   };
 
+  useEffect(() => {
+    try {
+      authenticate();
+    } catch (exception) {
+      console.log("Couldn't authenticate?!");
+    }
+  }, []);
+
   return (
     <View>
-      <Button onPress={demo}>test!</Button>
+      <Text>Implement me!</Text>
     </View>
   );
 
