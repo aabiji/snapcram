@@ -13,27 +13,83 @@ import (
 
 /*
 TODO:
+- implement and document the endpoints
 - implement the frontend
-- read secretes from docker secret files
-- POST /createTopic
-- POST /createDeck
-- POST /generateFlashcards
-- GET /getUserData
 - call endpoints from frontend
 */
 
-/*
-	"insert into Users (ID) values (?)"
+type App struct {
+	db			*sql.DB
+	jwtSecret	[]byte
+	groqApiKey	string
+}
 
-	"insert into Topics (ID, UserID, Name) values (?, ?, ?)"
-	"select * from Topics where UserID = ?"
+func setupDB(path string) (*sql.DB, error) {
+	db, err := sql.Open("sqlite3", path)
+	if err != nil {
+		return nil, err
+	}
 
-	"insert into Decks (ID, SessionID, Name) values (?, ?, ?)"
-	"select * from Decks where SessionID = ?"
+	statement := `
+			create table if not exists Users (ID text not null);
+			create table if not exists Topics (
+				ID integer not null primary key,
+				UserID integer not null, Name text not null
+			);
+			create table if not exists Decks (
+				ID integer not null primary key,
+				SessionID integer not null, Name text not null
+			);
+			create table if not exists Flashcards (
+				ID integer not null primary key,
+				DeckID integer not null,
+				Prompt text not null, Answer text not null
+			);`
+	_, err = db.Exec(statement)
+	if err != nil {
+		return nil, err
+	}
 
-	"insert into Flashcards (ID, DeckID, Prompt, Answer) values (?, ?, ?, ?)"
-	"select * from Flashcards where DeckID = ?"
-*/
+	return db, nil
+}
+
+func NewApp() (App, error) {
+	db, err := setupDB("test.db")
+	if err != nil {
+		return App{}, err
+	}
+
+	app := App{db: db}
+
+	// Load the secrets
+	data, err := readFile("/run/secrets/jwt_secret")
+	if err != nil {
+		return App{}, err
+	}
+	app.jwtSecret = data
+
+	data, err = readFile("/run/secrets/groq_api_key")
+	if err != nil {
+		return App{}, err
+	}
+	app.groqApiKey = string(data)
+
+	return app, nil
+}
+
+// Wrap our method into a HandlerFunc so that we can the
+// handler function can access 'app'
+func (app *App) wrapHandler(
+	method string,
+	fn func(w http.ResponseWriter, r *http.Request)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if len(method) > 0 && r.Method != method {
+			handleResponse(w, http.StatusNotFound, "")
+			return
+		}
+		fn(w, r)
+	}
+}
 
 func handleResponse(w http.ResponseWriter, statusCode int, object any) {
 	w.WriteHeader(statusCode)
@@ -58,25 +114,6 @@ func handleResponse(w http.ResponseWriter, statusCode int, object any) {
 	}
 }
 
-type App struct {
-	db        *sql.DB
-	jwtSecret []byte
-}
-
-// Wrap our method into a HandlerFunc so that we can the
-// handler function can access 'app'
-func (app *App) wrapHandler(
-	method string,
-	fn func(w http.ResponseWriter, r *http.Request)) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if len(method) > 0 && r.Method != method {
-			handleResponse(w, http.StatusNotFound, "")
-			return
-		}
-		fn(w, r)
-	}
-}
-
 func (app *App) getUserId(req *http.Request) (string, error) {
 	tokenStr := req.Header.Get("Authorization")
 	token, err := parseToken(tokenStr, app.jwtSecret)
@@ -97,6 +134,10 @@ func (app *App) getUserId(req *http.Request) (string, error) {
 	}
 
 	return userId, nil
+}
+
+func (app *App) handle404(w http.ResponseWriter, req *http.Request) {
+	handleResponse(w, http.StatusNotFound, "Endpoint not found")
 }
 
 func (app *App) handleFileUpload(w http.ResponseWriter, req *http.Request) {
@@ -159,16 +200,6 @@ func (app *App) handleFileUpload(w http.ResponseWriter, req *http.Request) {
 	handleResponse(w, http.StatusOK, response)
 }
 
-func (app *App) handle404(w http.ResponseWriter, req *http.Request) {
-	if req.URL.Path != "/" || req.Method != "GET" {
-		handleResponse(w, http.StatusNotFound, nil)
-		return
-	}
-
-	response := map[string]string{"message": "hello world 123"}
-	handleResponse(w, http.StatusOK, response)
-}
-
 func (app *App) createUser(w http.ResponseWriter, req *http.Request) {
 	userId := uuid.NewString()
 
@@ -194,45 +225,65 @@ func (app *App) createUser(w http.ResponseWriter, req *http.Request) {
 	handleResponse(w, http.StatusOK, response)
 }
 
-func setupDB(path string) (*sql.DB, error) {
-	db, err := sql.Open("sqlite3", path)
+func (app *App) createDeck(w http.ResponseWriter, req *http.Request) {
+	userId, err := app.getUserId(req)
 	if err != nil {
-		return nil, err
+		handleResponse(w, http.StatusBadRequest, nil)
+		return
 	}
 
-	statement := `
-			create table if not exists Users (ID text not null);
-			create table if not exists Topics (
-				ID integer not null primary key,
-				UserID integer not null, Name text not null
-			);
-			create table if not exists Decks (
-				ID integer not null primary key,
-				SessionID integer not null, Name text not null
-			);
-			create table if not exists Flashcards (
-				ID integer not null primary key,
-				DeckID integer not null,
-				Prompt text not null, Answer text not null
-			);`
-	_, err = db.Exec(statement)
+	sqlStr := "insert into Decks (ID, SessionID, Name) values (?, ?, ?)"
+	statement, err := app.db.Prepare(sqlStr)
+}
+
+func (app *App) createTopic(w http.ResponseWriter, req *http.Request) {
+	userId, err := app.getUserId(req)
 	if err != nil {
-		return nil, err
+		handleResponse(w, http.StatusBadRequest, nil)
+		return
 	}
 
-	return db, nil
+	sqlStr := "insert into Topics (ID, UserID, Name) values (?, ?, ?)"
+	statement, err := app.db.Prepare(sqlStr)
+}
+
+func (app *App) generateFlashcards(w http.ResponseWriter, req *http.Request) {
+	userId, err := app.getUserId(req)
+	if err != nil {
+		handleResponse(w, http.StatusBadRequest, nil)
+		return
+	}
+
+	sqlStr := "insert into Flashcards (ID, DeckID, Prompt, Answer) values (?, ?, ?, ?)"
+	statement, err := app.db.Prepare(sqlStr)
+}
+
+func (app *App) getUserData(w http.ResponseWriter, req *http.Request) {
+	userId, err := app.getUserId(req)
+	if err != nil {
+		handleResponse(w, http.StatusBadRequest, nil)
+		return
+	}
+/*
+	"select * from Topics where UserID = ?"
+	"select * from Decks where SessionID = ?"
+	"select * from Flashcards where DeckID = ?"
+*/
 }
 
 func main() {
-	db, err := setupDB("test.db")
+	app, err := NewApp()
 	if err != nil {
 		panic(err)
 	}
-	defer db.Close()
-	app := App{db: db, jwtSecret: []byte("super duper secret!")}
+	defer app.db.Close()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/create-user", app.wrapHandler("POST", app.createUser))
+	mux.HandleFunc("/createUser", app.wrapHandler("POST", app.createUser))
+	mux.HandleFunc("/createFlashcards", app.wrapHandler("POST", app.generateFlashcards))
+	mux.HandleFunc("/createDeck", app.wrapHandler("POST", app.createDeck))
+	mux.HandleFunc("/createTopic", app.wrapHandler("POST", app.createTopic))
+	mux.HandleFunc("/getUserData", app.wrapHandler("GET", app.getUserData))
 	mux.HandleFunc("/upload", app.wrapHandler("POST", app.handleFileUpload))
 	mux.HandleFunc("/", app.wrapHandler("", app.handle404))
 

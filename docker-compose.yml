@@ -16,3 +16,5 @@ services:
 secrets:
   groq_api_key:
     file: secrets/groq_api_key.txt
+  jwt_secret:
+    file: secrets/jwt_secret.txt
