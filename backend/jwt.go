@@ -6,10 +6,10 @@ import (
 	"time"
 )
 
-var DEFAULT_EXPIRY int64 = time.Now().Add(time.Hour * 24 * 100).Unix()
+func createToken(secret []byte, userId string) (string, error) {
+	expiry := time.Now().Add(time.Hour * 24 * 100).Unix() // Expires in 100 days
+	claims := jwt.MapClaims{"sub": userId, "exp": expiry}
 
-func createToken(secret []byte, userId string, expiryInSeconds int64) (string, error) {
-	claims := jwt.MapClaims{"sub": userId, "exp": expiryInSeconds}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	encoded, err := token.SignedString(secret)
 	if err != nil {

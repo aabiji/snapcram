@@ -1,16 +1,14 @@
-import { CameraView, useCameraPermissions } from "expo-camera";
-import { Image } from "expo-image";
-
+import * as ImagePicker from "expo-image-picker";
 import * as SecureStore from "expo-secure-store";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 
-import { Button, Text, View } from "tamagui";
+import { Button, Text, View, Image } from "tamagui";
 
 interface Request {
   method: string;
   endpoint: string;
-  payload?: object;
+  payload?: object | FormData;
   token?: string;
 };
 
@@ -19,46 +17,51 @@ async function sendRequest(request: Request) {
     const host = process.env.EXPO_PUBLIC_HOST_ADDRESS;
     const url = `http://${host}:8080${request.endpoint}`;
 
-    let headers = { Accept: "application/json", "Content-Type": "application/json" };
-    if (request.token) {
+    let headers = {};
+    if (request.token)
       headers["Authorization"] = request.token;
+
+    let body = request.payload;
+    if (body !== undefined) {
+      const isForm = body instanceof FormData;
+      if (!isForm) {
+        headers["Accept"] = "application/json"
+        headers["Content-Type"] = "application/json" 
+        body = JSON.stringify(body);
+      } else {
+        headers["Content-Type"] = "multipart/form-data";
+      }
     }
 
-    const response = await fetch(url, {
-      method: request.method, headers,
-      body: request.payload ? JSON.stringify(request.payload) : undefined,
-    });
-
-    return response;
+    return await fetch(url, { method: request.method, headers, body });
   } catch (error) {
     console.log("WTF?", error); 
    }
 }
 
-async function localStorageSet(key: string, value: string) {
-  await SecureStore.setItemAsync(key, value);
-}
-
-async function localStorageGet(key: string): Promise<string | null> {
-  let result = await SecureStore.getItemAsync(key);
-  return result;
-}
+const storageSet = async (key, value) => await SecureStore.setItemAsync(key, value);
+const storageRemove = async (key) => await SecureStore.deleteItemAsync(key);
+const storageGet = async (key) => await SecureStore.getItemAsync(key);
 
 export default function Index() {
   const [token, setToken] = useState("");
 
   const authenticate = async () => {
-    const jwt = await localStorageGet("jwt");
+    await storageRemove("jwt");
+
+    const jwt = await storageGet("jwt");
     if (jwt != null && jwt.length > 0) {
       setToken(jwt);
       return;
     }
 
-    const response = await sendRequest({ method: "GET", endpoint: "/create-user" });
+    const response = await sendRequest({ method: "POST", endpoint: "/createUser" });
     if (response.status == 200) {
       const json = await response.json();
-      await localStorageSet("jwt", json["token"])
+      await storageSet("jwt", json["token"])
       setToken(json["token"]);
+    } else {
+      console.log(response.status, response?.toString());
     }
   };
 
@@ -70,60 +73,74 @@ export default function Index() {
     }
   }, []);
 
-  return (
-    <View>
-      <Text>Implement me!</Text>
-    </View>
-  );
+  const [imageUris, setImageUris] = useState<string[]>([]);
 
-  /*
-  const [permission, requestPermission] = useCameraPermissions();
-  const camera = useRef<CameraView>(null);
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      allowsMultipleSelection: true,
+      mediaTypes: ["images"],
+      quality: 1,
+    });
 
-  const [imageUri, setImageUri] = useState<string | undefined>(undefined);
-  const [imageData, setImageData] = useState<string | undefined>("");
-
-  const takePicture = async () => {
-    const photo = await camera.current?.takePictureAsync({ base64: true });
-    setImageUri(photo?.uri);
-    setImageData(photo?.base64);
+    if (!result.canceled) {
+      const paths = result.assets.map((file) => file.uri);
+      setImageUris([...imageUris, ...paths]);
+    }
   };
 
-  // Camera permission is still loading
-  if (!permission) return null;
+  const uploadImages = async () => {
+    const formData = new FormData();
+    for (let uri of imageUris) {
+      const res = await fetch(uri);
+      const blob = await res.blob();
+      formData.append("file", blob);
+    }
 
-  // Permission not granted yet
-  if (!permission.granted) {
-    return (
-      <View>
-        <Text>This app requires permission to use the camera</Text>
-        <Button onPress={requestPermission}>Grant permission</Button>
-      </View>
-    );
+    const response = await sendRequest({
+      token,
+      method: "POST",
+      endpoint: "/uploadNotes",
+      payload: formData
+    });
+    const json = await response.json();
+    if (response.status == 200) {
+      console.log("success uploadNotes!", JSON.stringify(json));
+    } else {
+      console.log("error uploadNotes!", JSON.stringify(json));
+    }
   }
 
+  const createTopic = async () => {
+    const response = await sendRequest({
+      token,
+      method: "POST",
+      endpoint: "/createTopic",
+      payload: { name: "example" }
+    });
+    const json = await response.json();
+    if (response.status == 200) {
+      console.log("success createTopic!", JSON.stringify(json));
+    } else {
+      console.log("error createTopic!", JSON.stringify(json));
+    }
+  };
+
   return (
-    <View style={{ flex: 1 }}>
-      { !imageUri &&
-        <CameraView
-          facing="back"
-          mode="picture"
-          ref={camera}
-          style={{ flex: 1, width: "100%" }}>
-          <Button onPress={takePicture}> Take picture </Button>
-        </CameraView>
-      }
-      { imageUri &&
-        <View>
-          <Image
-            source={{ uri: imageUri }}
-            contentFit="contain"
-            style={{ aspectRatio: 1, width: 300 }}
-          />
-          <Button onPress={() => setImageUri(undefined)}>Take another image!</Button>
-        </View>
-      }
+    <View>
+      <Button onPress={createTopic}>Create an example topic</Button>
+
+      <Text> Select an image </Text>
+      <Button onPress={pickImage}>Pick an image</Button>
+
+      <View>
+          {imageUris.map((uri, index) => (
+            <Image
+              id={`${index}`}
+              source={{uri}}
+              style={{ aspectRatio: 1 }}
+            />
+          ))}
+      </View>
     </View>
   );
-  */
 }

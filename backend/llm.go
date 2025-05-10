@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"net/http"
+	"os"
 	"path/filepath"
 )
 
@@ -118,14 +118,14 @@ func promptWithFileContext(assetFolder string, text string, userId string, apiKe
 		})
 	}
 
-	textPrompt := Prompt{ Type: "Text", Text: text }
+	textPrompt := Prompt{Type: "Text", Text: text}
 
 	payload := Payload{
 		Model:  "meta-llama/llama-4-scout-17b-16e-instruct",
 		UserId: userId,
 		Messages: []Message{
-			{ Role: "user", Content: imagePrompts },
-			{ Role: "user", Content: []Prompt{textPrompt }},
+			{Role: "user", Content: imagePrompts},
+			{Role: "user", Content: []Prompt{textPrompt}},
 		},
 	}
 

@@ -106,6 +106,7 @@ func handleResponse(ctx *gin.Context, statusCode int, object any) {
 func (app *App) getUserID(ctx *gin.Context) (string, error) {
 	tokenStr := ctx.GetHeader("Authorization")
 	token, err := parseToken(tokenStr, app.jwtSecret)
+
 	if err != nil {
 		fmt.Println(err)
 		return "", fmt.Errorf("Invalid JWT")
@@ -141,7 +142,7 @@ func (app *App) CreateUser(ctx *gin.Context) {
 		return
 	}
 
-	tokenStr, err := createToken(app.jwtSecret, userId, DEFAULT_EXPIRY)
+	tokenStr, err := createToken(app.jwtSecret, userId)
 	if err != nil {
 		handleResponse(ctx, http.StatusInternalServerError, nil)
 		return
@@ -155,6 +156,7 @@ type CreateTopicData struct {
 	Name string `json:"name" binding:"required"`
 }
 
+// TODO: ensure the topic hasn't been created before
 // Create a new topic associated to the user. A topic
 // contains notes and flashcard decks
 func (app *App) CreateTopic(ctx *gin.Context) {
@@ -170,7 +172,7 @@ func (app *App) CreateTopic(ctx *gin.Context) {
 		return
 	}
 
-	sqlStr := "insert into Topics (UserID, Name) values (?, ?, ?)"
+	sqlStr := "insert into Topics (UserID, Name) values (?, ?)"
 	statement, err := app.db.Prepare(sqlStr)
 
 	_, err = statement.Exec(userId, data.Name)
@@ -240,7 +242,9 @@ type CreateDeckData struct {
 	UserPrompt string `json:"user_prompt" binding:"required"`
 }
 
-// TODO: test this! (what am I missing??)
+// TODO: test this (what am I missing??)
+// TODO: make sure the topic we're refering to actually exists
+
 // Create a new flashcard deck associated to a user's topic
 // Use all the files associated to the topic as llm context
 // Then prompt the llm using the prompt template and the
@@ -303,24 +307,10 @@ func (app *App) CreateDeck(ctx *gin.Context) {
 	response := map[string]any{
 		"message":    "Create deck!",
 		"flashcards": []string{responses[0]},
-		"deckId": deckId,
+		"deckId":     deckId,
 	}
 	handleResponse(ctx, http.StatusOK, response)
 }
-
-/*
-func (app *App) GetUserData(ctx *gin.Context) {
-	userId, err := app.getUserID(ctx)
-	if err != nil {
-		handleResponse(ctx, http.StatusBadRequest, nil)
-		return
-	}
-
-	statement, err := app.db.Prepare("select * from Topics where UserID = ?")
-	statement, err = app.db.Prepare("select * from Decks where TopicID = ?")
-	statement, err = app.db.Prepare("select * from Flashcards where DeckID = ?")
-}
-*/
 
 func main() {
 	app, err := NewApp()
@@ -341,5 +331,7 @@ func main() {
 	//server.GET("/getUserData", app.GetUserData)
 
 	fmt.Println("Serving the backend from port 8080")
-	server.Run(":8080")
+	if err := server.Run(); err != nil {
+		panic(err)
+	}
 }
