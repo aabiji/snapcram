@@ -2,8 +2,8 @@ package main
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	_ "github.com/mattn/go-sqlite3"
 	"net/http"
@@ -11,17 +11,13 @@ import (
 	"slices"
 )
 
-/*
-TODO:
-- implement and document the endpoints
-- implement the frontend
-- call endpoints from frontend
-*/
-
 type App struct {
-	db			*sql.DB
-	jwtSecret	[]byte
-	groqApiKey	string
+	db               *sql.DB
+	jwtSecret        []byte
+	groqApiKey       string
+	fileUploadLimit  int64
+	fileSizeLimit    int64
+	allowedMimetypes []string
 }
 
 func setupDB(path string) (*sql.DB, error) {
@@ -34,16 +30,19 @@ func setupDB(path string) (*sql.DB, error) {
 			create table if not exists Users (ID text not null);
 			create table if not exists Topics (
 				ID integer not null primary key,
-				UserID integer not null, Name text not null
+				UserID integer not null,
+				Name text not null
 			);
 			create table if not exists Decks (
 				ID integer not null primary key,
-				SessionID integer not null, Name text not null
+				TopicID integer not null,
+				Name text not null
 			);
 			create table if not exists Flashcards (
 				ID integer not null primary key,
 				DeckID integer not null,
-				Prompt text not null, Answer text not null
+				Question text not null,
+				Answer text not null
 			);`
 	_, err = db.Exec(statement)
 	if err != nil {
@@ -59,7 +58,12 @@ func NewApp() (App, error) {
 		return App{}, err
 	}
 
-	app := App{db: db}
+	app := App{
+		db:               db,
+		fileUploadLimit:  32 << 20, // 32 megabytes
+		fileSizeLimit:    10 << 20, // 20 megabytes
+		allowedMimetypes: []string{"image/png", "image/jpeg"},
+	}
 
 	// Load the secrets
 	data, err := readFile("/run/secrets/jwt_secret")
@@ -77,24 +81,8 @@ func NewApp() (App, error) {
 	return app, nil
 }
 
-// Wrap our method into a HandlerFunc so that we can the
-// handler function can access 'app'
-func (app *App) wrapHandler(
-	method string,
-	fn func(w http.ResponseWriter, r *http.Request)) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if len(method) > 0 && r.Method != method {
-			handleResponse(w, http.StatusNotFound, "")
-			return
-		}
-		fn(w, r)
-	}
-}
-
-func handleResponse(w http.ResponseWriter, statusCode int, object any) {
-	w.WriteHeader(statusCode)
-	w.Header().Set("Content-Type", "application/json")
-
+// Write response json that either holds an error message or some custom data
+func handleResponse(ctx *gin.Context, statusCode int, object any) {
 	message := ""
 	if statusCode == http.StatusNotFound {
 		message = "Page not found!"
@@ -105,17 +93,18 @@ func handleResponse(w http.ResponseWriter, statusCode int, object any) {
 	}
 
 	if statusCode != http.StatusOK {
-		response := map[string]any{
+		ctx.JSON(statusCode, gin.H{
 			"error": message, "details": object,
-		}
-		json.NewEncoder(w).Encode(response)
+		})
 	} else {
-		json.NewEncoder(w).Encode(object)
+		ctx.JSON(statusCode, object)
 	}
 }
 
-func (app *App) getUserId(req *http.Request) (string, error) {
-	tokenStr := req.Header.Get("Authorization")
+// Extract the user'd ID from the request header and
+// ensure the user exists, then return it
+func (app *App) getUserID(ctx *gin.Context) (string, error) {
+	tokenStr := ctx.GetHeader("Authorization")
 	token, err := parseToken(tokenStr, app.jwtSecret)
 	if err != nil {
 		fmt.Println(err)
@@ -136,140 +125,202 @@ func (app *App) getUserId(req *http.Request) (string, error) {
 	return userId, nil
 }
 
-func (app *App) handle404(w http.ResponseWriter, req *http.Request) {
-	handleResponse(w, http.StatusNotFound, "Endpoint not found")
-}
-
-func (app *App) handleFileUpload(w http.ResponseWriter, req *http.Request) {
-	if req.URL.Path != "/upload" {
-		handleResponse(w, http.StatusNotFound, nil)
-		return
-	}
-
-	var memoryCapacity int64 = 32 << 20 // 32 megabytes
-	var fileSizeLimit int64 = 10 << 20  // 10 megabytes
-	allowedMimetypes := []string{"image/png", "image/jpeg"}
-
-	err := req.ParseMultipartForm(memoryCapacity)
-	if err != nil {
-		handleResponse(w, http.StatusBadRequest, "Failed to parse form")
-		return
-	}
-
-	fileHeaders, ok := req.MultipartForm.File["file"]
-	if !ok || len(fileHeaders) == 0 {
-		handleResponse(w, http.StatusBadRequest, "No attached files")
-		return
-	}
-
-	for _, header := range fileHeaders {
-		if header.Size > fileSizeLimit {
-			msg := fmt.Sprintf("%s: too big", header.Filename)
-			handleResponse(w, http.StatusBadRequest, msg)
-			return
-		}
-
-		mimetype := header.Header.Get("Content-Type")
-		if !slices.Contains(allowedMimetypes, mimetype) {
-			msg := fmt.Sprintf("%s: invalid file type", header.Filename)
-			handleResponse(w, http.StatusBadRequest, msg)
-			return
-		}
-
-		file, err := header.Open()
-		if err != nil {
-			handleResponse(w, http.StatusInternalServerError, nil)
-			return
-		}
-
-		buffer := make([]byte, header.Size)
-		if _, err := file.Read(buffer); err != nil {
-			handleResponse(w, http.StatusInternalServerError, nil)
-			return
-		}
-		file.Close()
-
-		path := filepath.Join(".", "images", header.Filename)
-		if err := writeFile(path, buffer); err != nil {
-			handleResponse(w, http.StatusInternalServerError, nil)
-			return
-		}
-	}
-
-	response := map[string]string{"message": "Files uploaded successfully!"}
-	handleResponse(w, http.StatusOK, response)
-}
-
-func (app *App) createUser(w http.ResponseWriter, req *http.Request) {
+// Create a user and respond with a json web token containing the user'd ID
+func (app *App) CreateUser(ctx *gin.Context) {
 	userId := uuid.NewString()
 
 	statement, err := app.db.Prepare("insert into Users (ID) values (?);")
 	if err != nil {
-		handleResponse(w, http.StatusInternalServerError, nil)
+		handleResponse(ctx, http.StatusInternalServerError, nil)
 		return
 	}
 
 	_, err = statement.Exec(userId)
 	if err != nil {
-		handleResponse(w, http.StatusInternalServerError, nil)
+		handleResponse(ctx, http.StatusInternalServerError, nil)
 		return
 	}
 
 	tokenStr, err := createToken(app.jwtSecret, userId, DEFAULT_EXPIRY)
 	if err != nil {
-		handleResponse(w, http.StatusInternalServerError, nil)
+		handleResponse(ctx, http.StatusInternalServerError, nil)
 		return
 	}
 
 	response := map[string]string{"token": tokenStr}
-	handleResponse(w, http.StatusOK, response)
+	handleResponse(ctx, http.StatusOK, response)
 }
 
-func (app *App) createDeck(w http.ResponseWriter, req *http.Request) {
-	userId, err := app.getUserId(req)
+type CreateTopicData struct {
+	Name string `json:"name" binding:"required"`
+}
+
+// Create a new topic associated to the user. A topic
+// contains notes and flashcard decks
+func (app *App) CreateTopic(ctx *gin.Context) {
+	userId, err := app.getUserID(ctx)
 	if err != nil {
-		handleResponse(w, http.StatusBadRequest, nil)
+		handleResponse(ctx, http.StatusBadRequest, "Authentication required")
 		return
 	}
 
-	sqlStr := "insert into Decks (ID, SessionID, Name) values (?, ?, ?)"
+	var data CreateTopicData
+	if err := ctx.ShouldBindJSON(&data); err != nil {
+		handleResponse(ctx, http.StatusBadRequest, nil)
+		return
+	}
+
+	sqlStr := "insert into Topics (UserID, Name) values (?, ?, ?)"
 	statement, err := app.db.Prepare(sqlStr)
-}
 
-func (app *App) createTopic(w http.ResponseWriter, req *http.Request) {
-	userId, err := app.getUserId(req)
+	_, err = statement.Exec(userId, data.Name)
 	if err != nil {
-		handleResponse(w, http.StatusBadRequest, nil)
+		handleResponse(ctx, http.StatusInternalServerError, nil)
 		return
 	}
 
-	sqlStr := "insert into Topics (ID, UserID, Name) values (?, ?, ?)"
-	statement, err := app.db.Prepare(sqlStr)
+	handleResponse(ctx, http.StatusOK, nil)
 }
 
-func (app *App) generateFlashcards(w http.ResponseWriter, req *http.Request) {
-	userId, err := app.getUserId(req)
+type UploadNotesData struct {
+	TopicId string `json:"topicId" binding:"required"`
+}
+
+// Upload files that'll serve as context for the LLM
+// when it generates flashcards
+func (app *App) UploadNotes(ctx *gin.Context) {
+	userId, err := app.getUserID(ctx)
 	if err != nil {
-		handleResponse(w, http.StatusBadRequest, nil)
+		handleResponse(ctx, http.StatusBadRequest, "Authentication required")
 		return
 	}
 
-	sqlStr := "insert into Flashcards (ID, DeckID, Prompt, Answer) values (?, ?, ?, ?)"
-	statement, err := app.db.Prepare(sqlStr)
-}
-
-func (app *App) getUserData(w http.ResponseWriter, req *http.Request) {
-	userId, err := app.getUserId(req)
-	if err != nil {
-		handleResponse(w, http.StatusBadRequest, nil)
+	var data UploadNotesData
+	if err := ctx.ShouldBindJSON(&data); err != nil {
+		handleResponse(ctx, http.StatusBadRequest, nil)
 		return
 	}
+
+	form, err := ctx.MultipartForm()
+	if err != nil {
+		handleResponse(ctx, http.StatusBadRequest, nil)
+		return
+	}
+
+	files, ok := form.File["file"]
+	if !ok {
+		handleResponse(ctx, http.StatusBadRequest, "No attached files")
+		return
+	}
+
+	for _, file := range files {
+		if file.Size > app.fileSizeLimit {
+			msg := fmt.Sprintf("%s: too big", file.Filename)
+			handleResponse(ctx, http.StatusBadRequest, msg)
+			return
+		}
+
+		mimetype := file.Header.Get("Content-Type")
+		if !slices.Contains(app.allowedMimetypes, mimetype) {
+			msg := fmt.Sprintf("%s: invalid file type", file.Filename)
+			handleResponse(ctx, http.StatusBadRequest, msg)
+			return
+		}
+
+		path := filepath.Join(".", "images", userId, data.TopicId, file.Filename)
+		ctx.SaveUploadedFile(file, path)
+	}
+
+	handleResponse(ctx, http.StatusOK, nil)
+}
+
+type CreateDeckData struct {
+	TopicId    string `json:"topicId" binding:"required"`
+	Name       string `json:"name" binding:"required"`
+	UserPrompt string `json:"user_prompt" binding:"required"`
+}
+
+// TODO: test this! (what am I missing??)
+// Create a new flashcard deck associated to a user's topic
+// Use all the files associated to the topic as llm context
+// Then prompt the llm using the prompt template and the
+// additional user prompt. Then parse the flashcards and store
+// them in the database. Then return a json response containing
+// all the generated flashcards.
+func (app *App) CreateDeck(ctx *gin.Context) {
+	userId, err := app.getUserID(ctx)
+	if err != nil {
+		handleResponse(ctx, http.StatusBadRequest, "Authentication required")
+		return
+	}
+
+	var data CreateDeckData
+	if err := ctx.ShouldBindJSON(&data); err != nil {
+		handleResponse(ctx, http.StatusBadRequest, nil)
+		return
+	}
+
+	statement, err := app.db.Prepare("insert into Decks (TopicID, Name) values (?, ?)")
+	if err != nil {
+		handleResponse(ctx, http.StatusInternalServerError, nil)
+		return
+	}
+
+	result, err := statement.Exec(data.TopicId, data.Name)
+	if err != nil {
+		handleResponse(ctx, http.StatusInternalServerError, nil)
+		return
+	}
+
+	deckId, err := result.LastInsertId()
+	if err != nil {
+		handleResponse(ctx, http.StatusInternalServerError, nil)
+		return
+	}
+
+	template, err := readFile("./create-flashcards.txt")
+	if err != nil {
+		handleResponse(ctx, http.StatusInternalServerError, nil)
+		return
+	}
+	textPrompt := fmt.Sprintf("%s%s", template, data.UserPrompt)
+
+	userFolder := filepath.Join(".", "images", userId, data.TopicId)
+	responses, err := promptWithFileContext(
+		userFolder, textPrompt, userId, app.groqApiKey,
+	)
+
+	// TODO: actually parse the llm's response to get all the flashcards
+
+	sqlStr := "insert into Flashcards (DeckID, Question, Answer) values (?, ?, ?)"
+	statement, err = app.db.Prepare(sqlStr)
+	_, err = statement.Exec(deckId, "TODO!", responses[0])
+	if err != nil {
+		handleResponse(ctx, http.StatusInternalServerError, nil)
+		return
+	}
+
+	response := map[string]any{
+		"message":    "Create deck!",
+		"flashcards": []string{responses[0]},
+		"deckId": deckId,
+	}
+	handleResponse(ctx, http.StatusOK, response)
+}
+
 /*
-	"select * from Topics where UserID = ?"
-	"select * from Decks where SessionID = ?"
-	"select * from Flashcards where DeckID = ?"
-*/
+func (app *App) GetUserData(ctx *gin.Context) {
+	userId, err := app.getUserID(ctx)
+	if err != nil {
+		handleResponse(ctx, http.StatusBadRequest, nil)
+		return
+	}
+
+	statement, err := app.db.Prepare("select * from Topics where UserID = ?")
+	statement, err = app.db.Prepare("select * from Decks where TopicID = ?")
+	statement, err = app.db.Prepare("select * from Flashcards where DeckID = ?")
 }
+*/
 
 func main() {
 	app, err := NewApp()
@@ -278,15 +329,17 @@ func main() {
 	}
 	defer app.db.Close()
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/createUser", app.wrapHandler("POST", app.createUser))
-	mux.HandleFunc("/createFlashcards", app.wrapHandler("POST", app.generateFlashcards))
-	mux.HandleFunc("/createDeck", app.wrapHandler("POST", app.createDeck))
-	mux.HandleFunc("/createTopic", app.wrapHandler("POST", app.createTopic))
-	mux.HandleFunc("/getUserData", app.wrapHandler("GET", app.getUserData))
-	mux.HandleFunc("/upload", app.wrapHandler("POST", app.handleFileUpload))
-	mux.HandleFunc("/", app.wrapHandler("", app.handle404))
+	gin.SetMode(gin.ReleaseMode)
 
-	fmt.Println("Listening on port :8080")
-	http.ListenAndServe(":8080", mux)
+	server := gin.Default()
+	server.MaxMultipartMemory = 10 << 20 // 10 MB upload max
+
+	server.POST("/createUser", app.CreateUser)
+	server.POST("/uploadNotes", app.UploadNotes)
+	server.POST("/createTopic", app.CreateTopic)
+	server.POST("/createDeck", app.CreateDeck)
+	//server.GET("/getUserData", app.GetUserData)
+
+	fmt.Println("Serving the backend from port 8080")
+	server.Run(":8080")
 }

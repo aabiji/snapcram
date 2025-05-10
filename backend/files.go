@@ -57,12 +57,3 @@ func base64EncodeFile(path string) (string, error) {
 	formatted := fmt.Sprintf("data:%s;base64,%s", mimetype, builder.String())
 	return formatted, nil
 }
-
-// Write a file and create its parent folder if it doesn't already exist
-func writeFile(path string, data []byte) error {
-	folder := filepath.Dir(path)
-	if folder != "." {
-		os.MkdirAll(folder, 0644)
-	}
-	return os.WriteFile(path, data, 0644)
-}

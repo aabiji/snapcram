@@ -7,6 +7,9 @@ services:
       - "8080:8080"
     volumes:
       - ./backend:/snapcram
+    secrets:
+      - jwt_secret
+      - groq_api_key
     develop:
       watch:
         - action: restart
