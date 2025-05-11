@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/golang-jwt/jwt/v5"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 func createToken(secret []byte, userId string) (string, error) {

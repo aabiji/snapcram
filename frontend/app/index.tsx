@@ -8,47 +8,43 @@ import { Button, Text, View, Image } from "tamagui";
 interface Request {
   method: string;
   endpoint: string;
-  payload?: object | FormData;
+  payload?: object | FormData | undefined;
   token?: string;
 };
 
-async function sendRequest(request: Request) {
+async function sendRequest(request: Request): Promise<Response> {
   try {
     const host = process.env.EXPO_PUBLIC_HOST_ADDRESS;
     const url = `http://${host}:8080${request.endpoint}`;
 
-    let headers = {};
+    let headers: Record<string, string> = {};
     if (request.token)
       headers["Authorization"] = request.token;
 
-    let body = request.payload;
+    let body: any = request.payload;
     if (body !== undefined) {
       const isForm = body instanceof FormData;
       if (!isForm) {
         headers["Accept"] = "application/json"
         headers["Content-Type"] = "application/json" 
         body = JSON.stringify(body);
-      } else {
-        headers["Content-Type"] = "multipart/form-data";
       }
     }
 
-    return await fetch(url, { method: request.method, headers, body });
+    const r = await fetch(url, { method: request.method, headers, body });
+    return r!;
   } catch (error) {
-    console.log("WTF?", error); 
+    console.log("WTF?", error);
    }
 }
 
 const storageSet = async (key, value) => await SecureStore.setItemAsync(key, value);
-const storageRemove = async (key) => await SecureStore.deleteItemAsync(key);
 const storageGet = async (key) => await SecureStore.getItemAsync(key);
 
 export default function Index() {
   const [token, setToken] = useState("");
 
   const authenticate = async () => {
-    await storageRemove("jwt");
-
     const jwt = await storageGet("jwt");
     if (jwt != null && jwt.length > 0) {
       setToken(jwt);
@@ -73,7 +69,7 @@ export default function Index() {
     }
   }, []);
 
-  const [imageUris, setImageUris] = useState<string[]>([]);
+  const [images, setImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -82,19 +78,25 @@ export default function Index() {
       quality: 1,
     });
 
-    if (!result.canceled) {
-      const paths = result.assets.map((file) => file.uri);
-      setImageUris([...imageUris, ...paths]);
-    }
+    if (!result.canceled)
+      setImages([...images, ...result.assets]);
   };
 
   const uploadImages = async () => {
     const formData = new FormData();
-    for (let uri of imageUris) {
-      const res = await fetch(uri);
-      const blob = await res.blob();
-      formData.append("file", blob);
+
+    // Add the files
+    for (let image of images) {
+      formData.append("files", {
+        uri: image.uri,
+        type: image.mimeType,
+        name: image.uri
+      });
     }
+
+    // Add the json payload
+    const payload = { topicId: "1" };
+    formData.append("payload", JSON.stringify(payload));
 
     const response = await sendRequest({
       token,
@@ -108,6 +110,8 @@ export default function Index() {
     } else {
       console.log("error uploadNotes!", JSON.stringify(json));
     }
+
+    setImages([]);
   }
 
   const createTopic = async () => {
@@ -131,12 +135,13 @@ export default function Index() {
 
       <Text> Select an image </Text>
       <Button onPress={pickImage}>Pick an image</Button>
+      <Button onPress={uploadImages}>Upload</Button>
 
       <View>
-          {imageUris.map((uri, index) => (
+          {images.map((image, index) => (
             <Image
-              id={`${index}`}
-              source={{uri}}
+              key={`${index}`}
+              source={{ uri: image.uri }}
               style={{ aspectRatio: 1 }}
             />
           ))}

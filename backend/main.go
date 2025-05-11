@@ -2,13 +2,17 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	_ "github.com/mattn/go-sqlite3"
-	"net/http"
-	"path/filepath"
-	"slices"
 )
 
 type App struct {
@@ -30,7 +34,7 @@ func setupDB(path string) (*sql.DB, error) {
 			create table if not exists Users (ID text not null);
 			create table if not exists Topics (
 				ID integer not null primary key,
-				UserID integer not null,
+				UserID text not null,
 				Name text not null
 			);
 			create table if not exists Decks (
@@ -52,7 +56,7 @@ func setupDB(path string) (*sql.DB, error) {
 	return db, nil
 }
 
-func NewApp() (App, error) {
+func NewApp(baseSecretsPath string) (App, error) {
 	db, err := setupDB("test.db")
 	if err != nil {
 		return App{}, err
@@ -66,13 +70,15 @@ func NewApp() (App, error) {
 	}
 
 	// Load the secrets
-	data, err := readFile("/run/secrets/jwt_secret")
+	path := filepath.Join(baseSecretsPath, "jwt_secret")
+	data, err := readFile(path)
 	if err != nil {
 		return App{}, err
 	}
 	app.jwtSecret = data
 
-	data, err = readFile("/run/secrets/groq_api_key")
+	path = filepath.Join(baseSecretsPath, "groq_api_key")
+	data, err = readFile(path)
 	if err != nil {
 		return App{}, err
 	}
@@ -109,7 +115,7 @@ func (app *App) getUserID(ctx *gin.Context) (string, error) {
 
 	if err != nil {
 		fmt.Println(err)
-		return "", fmt.Errorf("Invalid JWT")
+		return "", fmt.Errorf("invalid json web token")
 	}
 
 	userId, err := token.Claims.GetSubject()
@@ -118,9 +124,18 @@ func (app *App) getUserID(ctx *gin.Context) (string, error) {
 	}
 
 	query, err := app.db.Prepare("select * from Users where ID = ?")
+	if err != nil {
+		return "", err
+	}
+
 	rows, err := query.Query(userId)
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+
 	if !rows.Next() {
-		return "", fmt.Errorf("User doesn't exist")
+		return "", fmt.Errorf("user doesn't exist")
 	}
 
 	return userId, nil
@@ -156,7 +171,6 @@ type CreateTopicData struct {
 	Name string `json:"name" binding:"required"`
 }
 
-// TODO: ensure the topic hasn't been created before
 // Create a new topic associated to the user. A topic
 // contains notes and flashcard decks
 func (app *App) CreateTopic(ctx *gin.Context) {
@@ -172,16 +186,46 @@ func (app *App) CreateTopic(ctx *gin.Context) {
 		return
 	}
 
-	sqlStr := "insert into Topics (UserID, Name) values (?, ?)"
-	statement, err := app.db.Prepare(sqlStr)
-
-	_, err = statement.Exec(userId, data.Name)
+	// Ensure that the topic hasn't already been created
+	query, err := app.db.Prepare("select * from Topics where UserID =? and Name =?")
 	if err != nil {
 		handleResponse(ctx, http.StatusInternalServerError, nil)
 		return
 	}
 
-	handleResponse(ctx, http.StatusOK, nil)
+	rows, err := query.Query(userId, data.Name)
+	if err != nil {
+		handleResponse(ctx, http.StatusInternalServerError, nil)
+		return
+	}
+	defer rows.Close()
+
+	if rows.Next() {
+		handleResponse(ctx, http.StatusNotAcceptable, "Topic has already been created")
+		return
+	}
+
+	// Insert a new row into the database
+	sqlStr := "insert into Topics (UserID, Name) values (?, ?)"
+	statement, err := app.db.Prepare(sqlStr)
+	if err != nil {
+		handleResponse(ctx, http.StatusInternalServerError, nil)
+		return
+	}
+
+	result, err := statement.Exec(userId, data.Name)
+	if err != nil {
+		handleResponse(ctx, http.StatusInternalServerError, nil)
+		return
+	}
+
+	topicId, err := result.LastInsertId()
+	if err != nil {
+		handleResponse(ctx, http.StatusInternalServerError, nil)
+		return
+	}
+
+	handleResponse(ctx, http.StatusOK, gin.H{"topicId": topicId})
 }
 
 type UploadNotesData struct {
@@ -197,19 +241,28 @@ func (app *App) UploadNotes(ctx *gin.Context) {
 		return
 	}
 
-	var data UploadNotesData
-	if err := ctx.ShouldBindJSON(&data); err != nil {
-		handleResponse(ctx, http.StatusBadRequest, nil)
-		return
-	}
-
 	form, err := ctx.MultipartForm()
 	if err != nil {
 		handleResponse(ctx, http.StatusBadRequest, nil)
 		return
 	}
 
-	files, ok := form.File["file"]
+	// Parse the json payload that was sent along with the multipart form
+	var data UploadNotesData
+	attachments, ok := form.Value["payload"]
+	if !ok {
+		handleResponse(ctx, http.StatusBadRequest, "No attached json payload")
+		return
+	}
+
+	err = json.Unmarshal([]byte(attachments[0]), &data)
+	if err != nil {
+		handleResponse(ctx, http.StatusBadRequest, nil)
+		return
+	}
+
+	// Download the files
+	files, ok := form.File["files"]
 	if !ok {
 		handleResponse(ctx, http.StatusBadRequest, "No attached files")
 		return
@@ -229,7 +282,7 @@ func (app *App) UploadNotes(ctx *gin.Context) {
 			return
 		}
 
-		path := filepath.Join(".", "images", userId, data.TopicId, file.Filename)
+		path := filepath.Join("..", "secrets", "images", userId, data.TopicId, file.Filename)
 		ctx.SaveUploadedFile(file, path)
 	}
 
@@ -293,11 +346,20 @@ func (app *App) CreateDeck(ctx *gin.Context) {
 	responses, err := promptWithFileContext(
 		userFolder, textPrompt, userId, app.groqApiKey,
 	)
+	if err != nil {
+		handleResponse(ctx, http.StatusInternalServerError, nil)
+		return
+	}
 
 	// TODO: actually parse the llm's response to get all the flashcards
 
 	sqlStr := "insert into Flashcards (DeckID, Question, Answer) values (?, ?, ?)"
 	statement, err = app.db.Prepare(sqlStr)
+	if err != nil {
+		handleResponse(ctx, http.StatusInternalServerError, nil)
+		return
+	}
+
 	_, err = statement.Exec(deckId, "TODO!", responses[0])
 	if err != nil {
 		handleResponse(ctx, http.StatusInternalServerError, nil)
@@ -312,14 +374,48 @@ func (app *App) CreateDeck(ctx *gin.Context) {
 	handleResponse(ctx, http.StatusOK, response)
 }
 
+// Parse a command line flag to determine if the program
+// should be ran in debug or release mode
+func isReleaseMode() (bool, error) {
+	msg := "--releaseMode=Debug or --releaseMode=Release is required"
+
+	args := os.Args[1:]
+	if len(args) == 0 {
+		return false, fmt.Errorf(msg)
+	}
+
+	parts := strings.Split(args[0], "=")
+	if len(parts) == 1 {
+		return false, fmt.Errorf(msg)
+	}
+
+	return parts[1] == "Release", nil
+}
+
 func main() {
-	app, err := NewApp()
+	release, err := isReleaseMode()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	secretsPath := "/run/secrets" // Docker secrets path
+	if !release {
+		secretsPath = "../secrets"
+	}
+
+	app, err := NewApp(secretsPath)
 	if err != nil {
 		panic(err)
 	}
 	defer app.db.Close()
 
-	gin.SetMode(gin.ReleaseMode)
+	if release {
+		gin.SetMode(gin.ReleaseMode)
+		fmt.Println("Serving the backend from port 8080 in release mode")
+	} else {
+		gin.SetMode(gin.DebugMode)
+	}
 
 	server := gin.Default()
 	server.MaxMultipartMemory = 10 << 20 // 10 MB upload max
@@ -330,7 +426,6 @@ func main() {
 	server.POST("/createDeck", app.CreateDeck)
 	//server.GET("/getUserData", app.GetUserData)
 
-	fmt.Println("Serving the backend from port 8080")
 	if err := server.Run(); err != nil {
 		panic(err)
 	}
