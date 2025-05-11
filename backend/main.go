@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -381,12 +382,12 @@ func isReleaseMode() (bool, error) {
 
 	args := os.Args[1:]
 	if len(args) == 0 {
-		return false, fmt.Errorf(msg)
+		return false, errors.New(msg)
 	}
 
 	parts := strings.Split(args[0], "=")
 	if len(parts) == 1 {
-		return false, fmt.Errorf(msg)
+		return false, errors.New(msg)
 	}
 
 	return parts[1] == "Release", nil

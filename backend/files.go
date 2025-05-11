@@ -51,7 +51,7 @@ func base64EncodeFile(path string) (string, error) {
 	} else if extension == "jpg" || extension == "jpeg" {
 		mimetype = "image/jpeg"
 	} else {
-		return "", errors.New("Unsupported file type")
+		return "", errors.New("unsupported file type")
 	}
 
 	formatted := fmt.Sprintf("data:%s;base64,%s", mimetype, builder.String())
