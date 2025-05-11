@@ -108,6 +108,21 @@ func handleResponse(ctx *gin.Context, statusCode int, object any) {
 	}
 }
 
+func (app *App) rowExists(query string, values ...any) (bool, error) {
+	statement, err := app.db.Prepare(query)
+	if err != nil {
+		return false, err
+	}
+
+	rows, err := statement.Query(values)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+
+	return rows.Next(), nil
+}
+
 // Extract the user'd ID from the request header and
 // ensure the user exists, then return it
 func (app *App) getUserID(ctx *gin.Context) (string, error) {
@@ -121,22 +136,16 @@ func (app *App) getUserID(ctx *gin.Context) (string, error) {
 
 	userId, err := token.Claims.GetSubject()
 	if err != nil {
-		return "", fmt.Errorf("JWT doesn't contain the user's id")
+		return "", fmt.Errorf("json web token doesn't contain the user's id")
 	}
 
-	query, err := app.db.Prepare("select * from Users where ID = ?")
+	exists, err := app.rowExists("select * from Users where ID = ?", userId)
 	if err != nil {
 		return "", err
 	}
 
-	rows, err := query.Query(userId)
-	if err != nil {
-		return "", err
-	}
-	defer rows.Close()
-
-	if !rows.Next() {
-		return "", fmt.Errorf("user doesn't exist")
+	if !exists {
+		return "", fmt.Errorf("user not found")
 	}
 
 	return userId, nil
@@ -188,20 +197,14 @@ func (app *App) CreateTopic(ctx *gin.Context) {
 	}
 
 	// Ensure that the topic hasn't already been created
-	query, err := app.db.Prepare("select * from Topics where UserID =? and Name =?")
+	exists, err :=
+		app.rowExists("select * from Topics where UserID=? and Name=?", userId, data.Name)
 	if err != nil {
 		handleResponse(ctx, http.StatusInternalServerError, nil)
 		return
 	}
 
-	rows, err := query.Query(userId, data.Name)
-	if err != nil {
-		handleResponse(ctx, http.StatusInternalServerError, nil)
-		return
-	}
-	defer rows.Close()
-
-	if rows.Next() {
+	if exists {
 		handleResponse(ctx, http.StatusNotAcceptable, "Topic has already been created")
 		return
 	}
@@ -259,6 +262,19 @@ func (app *App) UploadNotes(ctx *gin.Context) {
 	err = json.Unmarshal([]byte(attachments[0]), &data)
 	if err != nil {
 		handleResponse(ctx, http.StatusBadRequest, nil)
+		return
+	}
+
+	// Ensure the topic actually exists
+	exists, err :=
+		app.rowExists("select * from Topics where ID=?", data.TopicId)
+	if err != nil {
+		handleResponse(ctx, http.StatusInternalServerError, nil)
+		return
+	}
+
+	if !exists {
+		handleResponse(ctx, http.StatusNotAcceptable, "Topic not found")
 		return
 	}
 
