@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type ImageUrl struct {
@@ -29,6 +31,18 @@ type Payload struct {
 	Model    string    `json:"model"`
 	UserId   string    `json:"user"`
 	Messages []Message `json:"messages"`
+}
+
+func parsePromptTemplate(path string, data any) (string, error) {
+	t, err := template.ParseFiles(path)
+	if err != nil {
+		return "", err
+	}
+
+	output := &strings.Builder{}
+	err = t.Execute(output, data)
+
+	return output.String(), err
 }
 
 // Use the Groq api to prompt an LLM and return the potential LLM outputs

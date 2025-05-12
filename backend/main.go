@@ -310,6 +310,12 @@ type CreateDeckData struct {
 	TopicId    string `json:"topicId" binding:"required"`
 	Name       string `json:"name" binding:"required"`
 	UserPrompt string `json:"user_prompt" binding:"required"`
+	NumCards   int    `json:"num_cards" binding:"required"`
+}
+
+type PromptTemplate struct {
+	NumCards   int
+	UserPrompt string
 }
 
 // TODO: test this (what am I missing??)
@@ -352,16 +358,17 @@ func (app *App) CreateDeck(ctx *gin.Context) {
 		return
 	}
 
-	template, err := readFile("./create-flashcards.txt")
+	prompt, err := parsePromptTemplate("prompt.template", PromptTemplate{
+		NumCards: data.NumCards, UserPrompt: data.UserPrompt,
+	})
 	if err != nil {
 		handleResponse(ctx, http.StatusInternalServerError, nil)
 		return
 	}
-	textPrompt := fmt.Sprintf("%s%s", template, data.UserPrompt)
 
 	userFolder := filepath.Join(".", "images", userId, data.TopicId)
 	responses, err := promptWithFileContext(
-		userFolder, textPrompt, userId, app.groqApiKey,
+		userFolder, prompt, userId, app.groqApiKey,
 	)
 	if err != nil {
 		handleResponse(ctx, http.StatusInternalServerError, nil)
