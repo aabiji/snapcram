@@ -2,8 +2,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as SecureStore from "expo-secure-store";
 
 import { useEffect, useState } from "react";
-
-import { Button, Text, View, Image } from "tamagui";
+import { Button, Image, FlatList, StyleSheet, Text, View } from "react-native";
 
 interface Request {
   method: string;
@@ -131,21 +130,31 @@ export default function Index() {
 
   return (
     <View>
-      <Button onPress={createTopic}>Create an example topic</Button>
+      <Button title="Create an example topic" onPress={createTopic} />
 
       <Text> Select an image </Text>
-      <Button onPress={pickImage}>Pick an image</Button>
-      <Button onPress={uploadImages}>Upload</Button>
+      <Button title="Pick an image" onPress={pickImage} />
+      <Button title="Upload" onPress={uploadImages} />
 
-      <View>
-          {images.map((image, index) => (
-            <Image
-              key={`${index}`}
-              source={{ uri: image.uri }}
-              style={{ aspectRatio: 1 }}
-            />
-          ))}
-      </View>
+      <FlatList
+        style={styles.imageGrid}
+        data={images}
+        numColumns={2}
+        renderItem={({ item }) => (
+          <View>
+            <Image style={styles.gridItem} source={{ uri: item.uri }} />
+          </View>
+        )}
+      />
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  gridItem: { flex: 1, aspectRatio: 1 },
+  imageGrid: {
+    height: 300,
+    width: "95%",
+    margin: "auto"
+  }
+});
