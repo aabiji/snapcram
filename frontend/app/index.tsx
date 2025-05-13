@@ -2,7 +2,10 @@ import * as ImagePicker from "expo-image-picker";
 import * as SecureStore from "expo-secure-store";
 
 import { useEffect, useState } from "react";
-import { Button, Image, FlatList, StyleSheet, Text, View } from "react-native";
+import { FlatList, StyleSheet } from "react-native";
+
+import { Button, Image, Text, View } from "tamagui";
+import { X } from "@tamagui/lucide-icons";
 
 interface Request {
   method: string;
@@ -130,20 +133,20 @@ export default function Index() {
 
   return (
     <View>
-      <Button title="Create an example topic" onPress={createTopic} />
+      <Button onPress={createTopic}>Create an example topic</Button>
 
       <Text> Select an image </Text>
-      <Button title="Pick an image" onPress={pickImage} />
-      <Button title="Upload" onPress={uploadImages} />
+      <Button onPress={pickImage}>Pick an image</Button>
+      <Button onPress={uploadImages}>Upload</Button>
+
+      <Button icon={X}></Button>
 
       <FlatList
         style={styles.imageGrid}
         data={images}
         numColumns={2}
         renderItem={({ item }) => (
-          <View>
-            <Image style={styles.gridItem} source={{ uri: item.uri }} />
-          </View>
+          <Image style={styles.gridItem} source={{ uri: item.uri }} />
         )}
       />
     </View>
