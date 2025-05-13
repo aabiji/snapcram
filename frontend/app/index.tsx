@@ -4,8 +4,28 @@ import * as SecureStore from "expo-secure-store";
 import { useEffect, useState } from "react";
 import { FlatList, StyleSheet } from "react-native";
 
-import { Button, Image, Text, View } from "tamagui";
-import { X } from "@tamagui/lucide-icons";
+import { Button, Card, H1, H3, Image, ScrollView, Text, YStack } from "tamagui";
+import { LinearGradient } from "tamagui/linear-gradient";
+import { Plus } from "@tamagui/lucide-icons";
+
+/*
+TODO:
+- Fix the page so that the content actually fits in the view area
+- Splits this page into different components
+- The image grid at the top should have at most 4 images,
+  the images should be smaller, with a fade at the bottom.
+  When the user clicks the view all noets button, it should
+  open another screen where the user can add, delete and view assets
+- The deck grid should initially have at most 4 decks,
+  with a bottom fade and a show more button if there are more.
+  When you click the show more button, the list should just collapse,
+  (no extra sceen)
+  The tiles should be nicely styles, maybe pop off the page
+- The card backgrounds should be the same as the background,
+  no border
+- the buttons should hvae a white background and a border,
+  not a background color per say
+*/
 
 interface Request {
   method: string;
@@ -131,33 +151,100 @@ export default function Index() {
     }
   };
 
+  const createDeck = () => {};
+
+  const decks = [
+    { name: "Test deck #1" },
+    { name: "Test deck #2" },
+    { name: "Test deck #3" },
+    { name: "Test deck #4" }
+  ];
+
   return (
-    <View>
-      <Button onPress={createTopic}>Create an example topic</Button>
+    <ScrollView backgroundColor="$background">
+      <H1>Topic name</H1>
 
-      <Text> Select an image </Text>
-      <Button onPress={pickImage}>Pick an image</Button>
-      <Button onPress={uploadImages}>Upload</Button>
+      <Card
+        padding="$2"
+        margin="$2"
+        borderRadius="$4"
+      >
+        <YStack>
+          {images === undefined || images.length == 0 &&
+            <Button onPress={pickImage}>Add pictures of your notes or assignments</Button>
+          }
+          {images !== undefined && images.length > 0 &&
+          <YStack position="relative" flex={1}>
+              <FlatList
+                style={styles.grid}
+                data={images}
+                numColumns={2}
+                renderItem={({ item }) => (
+                  <Image style={styles.gridItem} source={{ uri: item.uri }} />
+                )}
+                scrollEnabled={false}
+              />
+              <LinearGradient
+                position="absolute"
+                bottom={0}
+                left={0}
+                right={0}
+                height={200}
+                colors={['transparent', '$background']}
+                pointerEvents="none"
+              />
+              <Button>View all notes</Button>
+            </YStack>
+          }
+        </YStack>
+      </Card>
 
-      <Button icon={X}></Button>
-
-      <FlatList
-        style={styles.imageGrid}
-        data={images}
-        numColumns={2}
-        renderItem={({ item }) => (
-          <Image style={styles.gridItem} source={{ uri: item.uri }} />
-        )}
-      />
-    </View>
+      <Card
+        borderRadius="$4"
+        padding="$2"
+        margin="$2"
+      >
+        <Card.Header flexDirection="row">
+          <H3>Decks</H3>
+          <Button marginLeft="auto" icon={Plus} onPress={createDeck}></Button>
+        </Card.Header>
+        <YStack>
+          {decks === undefined || decks.length == 0 &&
+            <Text>Create a flashcard deck</Text>
+          }
+          {decks !== undefined && decks.length > 0 &&
+            <FlatList
+              style={styles.grid}
+              data={decks}
+              numColumns={2}
+              scrollEnabled={false}
+              renderItem={({ item }) => (
+                <YStack backgroundColor="$gray5" style={styles.tile}><Text>{item.name}</Text></YStack>
+              )}
+            />
+          }
+        </YStack>
+      </Card>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  gridItem: { flex: 1, aspectRatio: 1 },
-  imageGrid: {
-    height: 300,
-    width: "95%",
-    margin: "auto"
+  gridItem: {
+    flex: 1,
+    aspectRatio: 1,
+    margin: 1
+  },
+  grid: {
+    height: "auto",
+    width: "96%",
+    borderRadius: 10,
+    margin: "auto",
+  },
+  tile: {
+    width: "50%",
+    aspectRatio: 1,
+    borderWidth: 1,
+    borderColor: "black",
   }
 });
