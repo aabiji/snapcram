@@ -4,9 +4,11 @@ import * as SecureStore from "expo-secure-store";
 import { useEffect, useState } from "react";
 import { FlatList, StyleSheet } from "react-native";
 
-import { Button, Card, H1, H3, Image, ScrollView, Text, YStack } from "tamagui";
+import { Button, Card, H2, H4, Image, Text, YStack } from "tamagui";
 import { LinearGradient } from "tamagui/linear-gradient";
 import { Plus } from "@tamagui/lucide-icons";
+
+import { router } from "expo-router";
 
 /*
 TODO:
@@ -93,17 +95,33 @@ export default function Index() {
 
   const [images, setImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
 
-  const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      allowsMultipleSelection: true,
-      mediaTypes: ["images"],
-      quality: 1,
-    });
 
-    if (!result.canceled)
-      setImages([...images, ...result.assets]);
+  const createTopic = async () => {
+    const response = await sendRequest({
+      token,
+      method: "POST",
+      endpoint: "/createTopic",
+      payload: { name: "example" }
+    });
+    const json = await response.json();
+    if (response.status == 200) {
+      console.log("success createTopic!", JSON.stringify(json));
+    } else {
+      console.log("error createTopic!", JSON.stringify(json));
+    }
   };
 
+  const createDeck = () => {};
+
+  const decks = [
+    { name: "Test deck #1" },
+    { name: "Test deck #2" },
+    { name: "Test deck #3" },
+    { name: "Test deck #4" }
+  ];
+
+
+  /*
   const uploadImages = async () => {
     const formData = new FormData();
 
@@ -135,34 +153,11 @@ export default function Index() {
 
     setImages([]);
   }
-
-  const createTopic = async () => {
-    const response = await sendRequest({
-      token,
-      method: "POST",
-      endpoint: "/createTopic",
-      payload: { name: "example" }
-    });
-    const json = await response.json();
-    if (response.status == 200) {
-      console.log("success createTopic!", JSON.stringify(json));
-    } else {
-      console.log("error createTopic!", JSON.stringify(json));
-    }
-  };
-
-  const createDeck = () => {};
-
-  const decks = [
-    { name: "Test deck #1" },
-    { name: "Test deck #2" },
-    { name: "Test deck #3" },
-    { name: "Test deck #4" }
-  ];
+  */
 
   return (
-    <ScrollView backgroundColor="$background">
-      <H1>Topic name</H1>
+    <YStack>
+      <H2>Topic name</H2>
 
       <Card
         padding="$2"
@@ -171,7 +166,8 @@ export default function Index() {
       >
         <YStack>
           {images === undefined || images.length == 0 &&
-            <Button onPress={pickImage}>Add pictures of your notes or assignments</Button>
+            /*<Button onPress={pickImage}>Add pictures of your notes or assignments</Button>*/
+            <Button onPress={() => router.push("/imagePicker")}>View all images</Button>
           }
           {images !== undefined && images.length > 0 &&
           <YStack position="relative" flex={1}>
@@ -205,7 +201,7 @@ export default function Index() {
         margin="$2"
       >
         <Card.Header flexDirection="row">
-          <H3>Decks</H3>
+          <H4>Decks</H4>
           <Button marginLeft="auto" icon={Plus} onPress={createDeck}></Button>
         </Card.Header>
         <YStack>
@@ -225,7 +221,7 @@ export default function Index() {
           }
         </YStack>
       </Card>
-    </ScrollView>
+    </YStack>
   );
 }
 
@@ -236,7 +232,7 @@ const styles = StyleSheet.create({
     margin: 1
   },
   grid: {
-    height: "auto",
+    height: 300,
     width: "96%",
     borderRadius: 10,
     margin: "auto",

@@ -11,6 +11,10 @@ export default function RootLayout() {
           name="index"
           options={{ headerShown: false }}
         />
+        <Stack.Screen
+          name="imageViewer"
+          options={{ headerShown: false }}
+        />
       </Stack>
     </TamaguiProvider>
   );
