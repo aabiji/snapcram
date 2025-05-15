@@ -1,5 +1,4 @@
 import * as ImagePicker from "expo-image-picker";
-import * as SecureStore from "expo-secure-store";
 
 import { useEffect, useLayoutEffect, useState } from "react";
 import { FlatList, Pressable, StyleSheet, View } from "react-native";
@@ -7,6 +6,8 @@ import { FlatList, Pressable, StyleSheet, View } from "react-native";
 import { Text, Button, Image, XStack, YStack } from "tamagui";
 import { X, Plus, Trash } from "@tamagui/lucide-icons";
 import { useNavigation } from "expo-router";
+
+import { setValue, getValue } from "./lib/storage";
 
 type ImageData = { uri: string; mimetype: string; };
 
@@ -19,16 +20,8 @@ export default function PickerPopup() {
   const [images, setImages] = useState<ImageData[]>([]);
   const [currentImage, setCurrentImage] = useState<number>(-1);
 
-  const saveImages = async (list: ImageData[]) => {
-    const str = JSON.stringify(list);
-    await SecureStore.setItemAsync("images", str);
-  }
-
-  const loadImages = async () => {
-    const valueStr = await SecureStore.getItemAsync("images");
-    const imageList = JSON.parse(valueStr ?? "[]");
-    setImages(imageList);
-  }
+  const saveImages = async (list: ImageData[]) => await setValue("images", list);
+  const loadImages = async () => setImages(await getValue("images"));
 
   const addImages = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({

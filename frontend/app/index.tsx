@@ -1,14 +1,12 @@
-import * as ImagePicker from "expo-image-picker";
-import * as SecureStore from "expo-secure-store";
+import { useEffect, useLayoutEffect, useState } from "react";
+import { StyleSheet } from "react-native";
 
-import { useEffect, useState } from "react";
-import { FlatList, StyleSheet } from "react-native";
+import { Button, H3, ListItem, XStack, YGroup, YStack } from "tamagui";
+import { ChevronRight, Plus } from "@tamagui/lucide-icons";
 
-import { Button, Card, H2, H4, Image, Text, YStack } from "tamagui";
-import { LinearGradient } from "tamagui/linear-gradient";
-import { Plus } from "@tamagui/lucide-icons";
+import { router, useNavigation } from "expo-router";
 
-import { router } from "expo-router";
+import { getValue, setValue } from "./lib/storage";
 
 /*
 TODO:
@@ -50,7 +48,7 @@ async function sendRequest(request: Request): Promise<Response> {
       const isForm = body instanceof FormData;
       if (!isForm) {
         headers["Accept"] = "application/json"
-        headers["Content-Type"] = "application/json" 
+        headers["Content-Type"] = "application/json"
         body = JSON.stringify(body);
       }
     }
@@ -62,14 +60,28 @@ async function sendRequest(request: Request): Promise<Response> {
    }
 }
 
-const storageSet = async (key, value) => await SecureStore.setItemAsync(key, value);
-const storageGet = async (key) => await SecureStore.getItemAsync(key);
-
 export default function Index() {
+  const navigation = useNavigation();
+
   const [token, setToken] = useState("");
 
+  const decks = [
+    {
+      name: "Test deck #1",
+      cards: [
+        { confident: false, front: "What is the capital city of Japan?", back: "Tokyo" },
+        { confident: false, front: "Who wrote the play Romeo and Juliet?", back: "William Shakespeare" },
+        { confident: false, front: "What is the largest planet in our solar system?", back: "Jupiter" },
+        { confident: false, front: "In what year did the Titanic sink?", back: "1912" },
+        { confident: false, front: "What element does 'O' represent on the periodic table?", back: "Oxygen" }
+      ]
+    },
+  ];
+
   const authenticate = async () => {
-    const jwt = await storageGet("jwt");
+    await setValue("decks", decks);
+
+    const jwt = await getValue("jwt");
     if (jwt != null && jwt.length > 0) {
       setToken(jwt);
       return;
@@ -78,7 +90,7 @@ export default function Index() {
     const response = await sendRequest({ method: "POST", endpoint: "/createUser" });
     if (response.status == 200) {
       const json = await response.json();
-      await storageSet("jwt", json["token"])
+      await setValue("jwt", json["token"])
       setToken(json["token"]);
     } else {
       console.log(response.status, response?.toString());
@@ -92,9 +104,6 @@ export default function Index() {
       console.log("Couldn't authenticate?!");
     }
   }, []);
-
-  const [images, setImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
-
 
   const createTopic = async () => {
     const response = await sendRequest({
@@ -113,13 +122,12 @@ export default function Index() {
 
   const createDeck = () => {};
 
-  const decks = [
-    { name: "Test deck #1" },
-    { name: "Test deck #2" },
-    { name: "Test deck #3" },
-    { name: "Test deck #4" }
-  ];
-
+  const viewDeck = (index: number) => {
+    router.push({
+      pathname: "/deckViewer",
+      params: { index: index }
+    });
+  }
 
   /*
   const uploadImages = async () => {
@@ -155,92 +163,39 @@ export default function Index() {
   }
   */
 
+  useLayoutEffect(() => {
+    navigation.setOptions({ title: "Our topic name" });
+  }, [navigation]);
+
   return (
     <YStack>
-      <H2>Topic name</H2>
+      <Button onPress={() => router.push("/imagePicker")}>View all images</Button>
+      <XStack>
+        <H3>Your decks</H3>
+        <Button
+          marginLeft="auto"
+          onPress={createDeck}
+          icon={Plus}
+        />
+      </XStack>
 
-      <Card
-        padding="$2"
-        margin="$2"
-        borderRadius="$4"
-      >
-        <YStack>
-          {images === undefined || images.length == 0 &&
-            /*<Button onPress={pickImage}>Add pictures of your notes or assignments</Button>*/
-            <Button onPress={() => router.push("/imagePicker")}>View all images</Button>
-          }
-          {images !== undefined && images.length > 0 &&
-          <YStack position="relative" flex={1}>
-              <FlatList
-                style={styles.grid}
-                data={images}
-                numColumns={2}
-                renderItem={({ item }) => (
-                  <Image style={styles.gridItem} source={{ uri: item.uri }} />
-                )}
-                scrollEnabled={false}
-              />
-              <LinearGradient
-                position="absolute"
-                bottom={0}
-                left={0}
-                right={0}
-                height={200}
-                colors={['transparent', '$background']}
-                pointerEvents="none"
-              />
-              <Button>View all notes</Button>
-            </YStack>
-          }
-        </YStack>
-      </Card>
-
-      <Card
-        borderRadius="$4"
-        padding="$2"
-        margin="$2"
-      >
-        <Card.Header flexDirection="row">
-          <H4>Decks</H4>
-          <Button marginLeft="auto" icon={Plus} onPress={createDeck}></Button>
-        </Card.Header>
-        <YStack>
-          {decks === undefined || decks.length == 0 &&
-            <Text>Create a flashcard deck</Text>
-          }
-          {decks !== undefined && decks.length > 0 &&
-            <FlatList
-              style={styles.grid}
-              data={decks}
-              numColumns={2}
-              scrollEnabled={false}
-              renderItem={({ item }) => (
-                <YStack backgroundColor="$gray5" style={styles.tile}><Text>{item.name}</Text></YStack>
-              )}
+      <YGroup alignSelf="center" bordered gap={10}>
+        {decks.map((item, index) => (
+          <YGroup.Item key={index}>
+            <ListItem
+              bordered
+              hoverTheme
+              pressTheme
+              title={item.name}
+              iconAfter={ChevronRight}
+              onPress={() => viewDeck(index)}
             />
-          }
-        </YStack>
-      </Card>
+          </YGroup.Item>
+        ))}
+      </YGroup>
     </YStack>
   );
 }
 
 const styles = StyleSheet.create({
-  gridItem: {
-    flex: 1,
-    aspectRatio: 1,
-    margin: 1
-  },
-  grid: {
-    height: 300,
-    width: "96%",
-    borderRadius: 10,
-    margin: "auto",
-  },
-  tile: {
-    width: "50%",
-    aspectRatio: 1,
-    borderWidth: 1,
-    borderColor: "black",
-  }
 });

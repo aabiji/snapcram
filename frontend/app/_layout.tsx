@@ -7,14 +7,9 @@ export default function RootLayout() {
   return (
     <TamaguiProvider config={tamaguiConfig}>
       <Stack>
-        <Stack.Screen
-          name="index"
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="imageViewer"
-          options={{ headerShown: false }}
-        />
+        <Stack.Screen name="index" />
+        <Stack.Screen name="deckViewer" />
+        <Stack.Screen name="imagePicker" options={{ title: "Notes" }} />
       </Stack>
     </TamaguiProvider>
   );
