@@ -8,8 +8,7 @@ import { X, Plus, Trash } from "@tamagui/lucide-icons";
 import { useNavigation } from "expo-router";
 
 import { setValue, getValue } from "./lib/storage";
-
-type ImageData = { uri: string; mimetype: string; };
+import { ImageData } from "./lib/types";
 
 // TODO: use this instead: https://docs.expo.dev/versions/latest/sdk/media-library
 // And ensure that no duplicates iamges can exist
@@ -21,7 +20,7 @@ export default function PickerPopup() {
   const [currentImage, setCurrentImage] = useState<number>(-1);
 
   const saveImages = async (list: ImageData[]) => await setValue("images", list);
-  const loadImages = async () => setImages(await getValue("images"));
+  const loadImages = async () => setImages(await getValue("images") ?? []);
 
   const addImages = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({

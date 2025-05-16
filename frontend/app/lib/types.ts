@@ -1,0 +1,1 @@
+export type ImageData = { uri: string; mimetype: string; };

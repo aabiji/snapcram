@@ -1,12 +1,13 @@
 import { useEffect, useLayoutEffect, useState } from "react";
 import { StyleSheet } from "react-native";
 
-import { Button, H3, ListItem, XStack, YGroup, YStack } from "tamagui";
+import { Button, H3, ListItem, Spinner, XStack, YGroup, YStack } from "tamagui";
 import { ChevronRight, Plus } from "@tamagui/lucide-icons";
 
 import { router, useNavigation } from "expo-router";
 
 import { getValue, setValue } from "./lib/storage";
+import { ImageData } from "./lib/types";
 
 /*
 TODO:
@@ -79,6 +80,11 @@ export default function Index() {
   ];
 
   const authenticate = async () => {
+    // reset:
+    //deleteItemAsync("decks");
+    //deleteItemAsync("jwt");
+    //deleteItemAsync("images");
+
     await setValue("decks", decks);
 
     const jwt = await getValue("jwt");
@@ -129,15 +135,19 @@ export default function Index() {
     });
   }
 
-  /*
+  // TODO: was trying to test the create deck endpoint
+  const [uploading, setUploading] = useState(false);
   const uploadImages = async () => {
+    setUploading(true);
+
+    const images = (await getValue("images") as any) as ImageData[];
     const formData = new FormData();
 
     // Add the files
     for (let image of images) {
       formData.append("files", {
         uri: image.uri,
-        type: image.mimeType,
+        type: image.mimetype,
         name: image.uri
       });
     }
@@ -159,9 +169,8 @@ export default function Index() {
       console.log("error uploadNotes!", JSON.stringify(json));
     }
 
-    setImages([]);
+    setUploading(false);
   }
-  */
 
   useLayoutEffect(() => {
     navigation.setOptions({ title: "Our topic name" });
@@ -170,6 +179,12 @@ export default function Index() {
   return (
     <YStack>
       <Button onPress={() => router.push("/imagePicker")}>View all images</Button>
+
+      <Button onPress={() => uploadImages()}>
+        Upload images
+        {uploading && <Spinner size="small" />}
+      </Button>
+
       <XStack>
         <H3>Your decks</H3>
         <Button

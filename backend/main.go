@@ -22,6 +22,7 @@ type App struct {
 	groqApiKey       string
 	fileUploadLimit  int64
 	fileSizeLimit    int64
+	assetFolder      string
 	allowedMimetypes []string
 }
 
@@ -85,6 +86,8 @@ func NewApp(baseSecretsPath string) (App, error) {
 	}
 	app.groqApiKey = string(data)
 
+	app.assetFolder = filepath.Join("..", "secrets", "images")
+
 	return app, nil
 }
 
@@ -114,7 +117,7 @@ func (app *App) rowExists(query string, values ...any) (bool, error) {
 		return false, err
 	}
 
-	rows, err := statement.Query(values)
+	rows, err := statement.Query(values...)
 	if err != nil {
 		return false, err
 	}
@@ -130,7 +133,6 @@ func (app *App) getUserID(ctx *gin.Context) (string, error) {
 	token, err := parseToken(tokenStr, app.jwtSecret)
 
 	if err != nil {
-		fmt.Println(err)
 		return "", fmt.Errorf("invalid json web token")
 	}
 
@@ -299,7 +301,7 @@ func (app *App) UploadNotes(ctx *gin.Context) {
 			return
 		}
 
-		path := filepath.Join("..", "secrets", "images", userId, data.TopicId, file.Filename)
+		path := filepath.Join(app.assetFolder, userId, data.TopicId, file.Filename)
 		ctx.SaveUploadedFile(file, path)
 	}
 
@@ -340,23 +342,25 @@ func (app *App) CreateDeck(ctx *gin.Context) {
 		return
 	}
 
-	statement, err := app.db.Prepare("insert into Decks (TopicID, Name) values (?, ?)")
-	if err != nil {
-		handleResponse(ctx, http.StatusInternalServerError, nil)
-		return
-	}
+	/*
+		statement, err := app.db.Prepare("insert into Decks (TopicID, Name) values (?, ?)")
+		if err != nil {
+			handleResponse(ctx, http.StatusInternalServerError, nil)
+			return
+		}
 
-	result, err := statement.Exec(data.TopicId, data.Name)
-	if err != nil {
-		handleResponse(ctx, http.StatusInternalServerError, nil)
-		return
-	}
+		result, err := statement.Exec(data.TopicId, data.Name)
+		if err != nil {
+			handleResponse(ctx, http.StatusInternalServerError, nil)
+			return
+		}
 
-	deckId, err := result.LastInsertId()
-	if err != nil {
-		handleResponse(ctx, http.StatusInternalServerError, nil)
-		return
-	}
+		deckId, err := result.LastInsertId()
+		if err != nil {
+			handleResponse(ctx, http.StatusInternalServerError, nil)
+			return
+		}
+	*/
 
 	prompt, err := parsePromptTemplate("prompt.template", PromptTemplate{
 		NumCards: data.NumCards, UserPrompt: data.UserPrompt,
@@ -366,7 +370,7 @@ func (app *App) CreateDeck(ctx *gin.Context) {
 		return
 	}
 
-	userFolder := filepath.Join(".", "images", userId, data.TopicId)
+	userFolder := filepath.Join(app.assetFolder, userId, data.TopicId)
 	responses, err := promptWithFileContext(
 		userFolder, prompt, userId, app.groqApiKey,
 	)
@@ -374,26 +378,31 @@ func (app *App) CreateDeck(ctx *gin.Context) {
 		handleResponse(ctx, http.StatusInternalServerError, nil)
 		return
 	}
-
-	// TODO: actually parse the llm's response to get all the flashcards
-
-	sqlStr := "insert into Flashcards (DeckID, Question, Answer) values (?, ?, ?)"
-	statement, err = app.db.Prepare(sqlStr)
-	if err != nil {
-		handleResponse(ctx, http.StatusInternalServerError, nil)
-		return
+	for _, r := range responses {
+		fmt.Println(r)
 	}
 
-	_, err = statement.Exec(deckId, "TODO!", responses[0])
-	if err != nil {
-		handleResponse(ctx, http.StatusInternalServerError, nil)
-		return
-	}
+	/*
+		// TODO: actually parse the llm's response to get all the flashcards
+
+		sqlStr := "insert into Flashcards (DeckID, Question, Answer) values (?, ?, ?)"
+		statement, err = app.db.Prepare(sqlStr)
+		if err != nil {
+			handleResponse(ctx, http.StatusInternalServerError, nil)
+			return
+		}
+
+		_, err = statement.Exec(deckId, "TODO!", responses[0])
+		if err != nil {
+			handleResponse(ctx, http.StatusInternalServerError, nil)
+			return
+		}
+	*/
 
 	response := map[string]any{
-		"message":    "Create deck!",
-		"flashcards": []string{responses[0]},
-		"deckId":     deckId,
+		"message": "Success!",
+		//"flashcards": []string{responses[0]},
+		//"deckId": deckId,
 	}
 	handleResponse(ctx, http.StatusOK, response)
 }

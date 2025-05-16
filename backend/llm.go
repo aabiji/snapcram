@@ -28,9 +28,10 @@ type Message struct {
 }
 
 type Payload struct {
-	Model    string    `json:"model"`
-	UserId   string    `json:"user"`
-	Messages []Message `json:"messages"`
+	Model          string    `json:"model"`
+	UserId         string    `json:"user"`
+	Messages       []Message `json:"messages"`
+	ResponseFormat string    `json:"response_format"`
 }
 
 func parsePromptTemplate(path string, data any) (string, error) {
@@ -94,7 +95,7 @@ func promptGroqLLM(payload Payload, apiKey string) ([]string, error) {
 
 // Use the Groq api to prompt an LLM using the file prompts
 // and the text prompt and return the potential LLM outputs
-func promptWithFileContext(assetFolder string, text string, userId string, apiKey string) ([]string, error) {
+func promptWithFileContext(assetFolder, text, userId, apiKey string) ([]string, error) {
 
 	// TODO: batch requests since there's a prompt limit
 	// Can only have a maximum of 5 images per request
@@ -141,6 +142,7 @@ func promptWithFileContext(assetFolder string, text string, userId string, apiKe
 			{Role: "user", Content: imagePrompts},
 			{Role: "user", Content: []Prompt{textPrompt}},
 		},
+		ResponseFormat: "json_object",
 	}
 
 	responses, err := promptGroqLLM(payload, apiKey)
