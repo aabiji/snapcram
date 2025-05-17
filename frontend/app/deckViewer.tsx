@@ -6,27 +6,26 @@ import { StyleSheet } from "react-native";
 import { Button, H4, Text, View, XStack, YStack } from "tamagui";
 import { Check, X, Redo } from "@tamagui/lucide-icons";
 
-import { getValue, setValue } from "./lib/storage";
+import { storageGet, storageSet, Deck } from "./helpers";
 
 export default function DeckViewer() {
   const navigation = useNavigation();
   const routeParams = useLocalSearchParams();
   const index = Number(routeParams.index);
 
-  const [deck, setDeck] = useState(undefined);
-  const [decks, setDecks] = useState([]);
+  const [deck, setDeck] = useState<Deck | undefined>(undefined);
+  const [decks, setDecks] = useState<Deck[]>(undefined);
 
   const [cardIndex, setCardIndex] = useState(0);
   const [showFront, setShowFront] = useState(true);
   const [done, setDone] = useState(false);
 
   const loadDeck = async () => {
-    const list = await getValue("decks");
-    setDecks(list);
-
+    const list = (storageGet("decks") as any) as Deck[];
     const current = list[index];
     navigation.setOptions({title: current.name});
     setDeck(current);
+    setDecks(list);
   }
 
   useLayoutEffect(() => { loadDeck(); }, [navigation]);
@@ -35,13 +34,13 @@ export default function DeckViewer() {
 
   // ex: did you know the info on the card, or should we
   // keep showing you this card until you have it memorized?
-  const setConfidence = (state: boolean) => {
-    deck.confidence = state;
+  const setConfidence = (confident: boolean) => {
+    deck.cards[cardIndex].confident = confident;
 
-    setDecks(prev => {
-      const copy = [...decks];
+    setDecks((prev: Deck[]) => {
+      const copy = [...prev];
       copy[index] = deck;
-      setValue("decks", copy);
+      storageSet("decks", copy);
       return copy;
     });
 
