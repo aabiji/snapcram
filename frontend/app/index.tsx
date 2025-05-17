@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useState } from "react";
 
-import { Button, ListItem, YGroup, YStack } from "tamagui";
+import { Button, ListItem, YGroup, View } from "tamagui";
 import { ChevronRight, Plus } from "@tamagui/lucide-icons";
 
 import { router, useNavigation } from "expo-router";
@@ -71,7 +71,7 @@ export default function Index() {
   }, [navigation]);
 
   return (
-    <YStack>
+    <View flex={1}>
       {showModal && <CreateDeck setClose={() => setShowModal(false)} />}
 
       <YGroup alignSelf="center" bordered gap={10}>
@@ -90,6 +90,6 @@ export default function Index() {
           </YGroup.Item>
         ))}
       </YGroup>
-    </YStack>
+    </View>
   );
 }
