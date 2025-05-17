@@ -4,9 +4,11 @@ import * as SecureStore from "expo-secure-store";
 export const storageSet = (key: string, value: any) =>
   SecureStore.setItem(key, JSON.stringify(value));
 
-export const storageGet = async (key: string): Promise<any> => {
+export function storageGet<T>(key: string, isString?: boolean): T | undefined {
   const str = SecureStore.getItem(key);
-  return str ? JSON.parse(str) : undefined;
+  if (str !== null)
+    return isString ? str as T : JSON.parse(str) as unknown as T;
+  return undefined;
 }
 
 export const removeValue = async (key: string) =>
@@ -40,13 +42,8 @@ export async function request(
 }
 
 // -- Types
-export interface Flashcard {
-  confident: boolean;
-  front: string;
-  back: string;
-}
+export interface Flashcard { confident: boolean; front: string; back: string; }
 
-export interface Deck {
-  name: string;
-  cards: Flashcard[];
-}
+export interface Deck { name: string; cards: Flashcard[]; }
+
+export interface ImageInfo { uri: string; mimetype: string; }

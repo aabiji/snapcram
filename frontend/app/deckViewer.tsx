@@ -14,14 +14,14 @@ export default function DeckViewer() {
   const index = Number(routeParams.index);
 
   const [deck, setDeck] = useState<Deck | undefined>(undefined);
-  const [decks, setDecks] = useState<Deck[]>(undefined);
+  const [_, setDecks] = useState<Deck[]>([]);
 
   const [cardIndex, setCardIndex] = useState(0);
   const [showFront, setShowFront] = useState(true);
   const [done, setDone] = useState(false);
 
   const loadDeck = async () => {
-    const list = (storageGet("decks") as any) as Deck[];
+    const list = storageGet<Deck[]>("decks")!;
     const current = list[index];
     navigation.setOptions({title: current.name});
     setDeck(current);

@@ -1,14 +1,18 @@
-import { useEffect, useState } from "react";
-import { StyleSheet } from "react-native";
+import { useEffect, useLayoutEffect, useState } from "react";
 
-import { Button, H3, ListItem, XStack, YGroup, YStack } from "tamagui";
+import { Button, ListItem, YGroup, YStack } from "tamagui";
 import { ChevronRight, Plus } from "@tamagui/lucide-icons";
 
-import { router } from "expo-router";
+import { router, useNavigation } from "expo-router";
+
+import CreateDeck from "./createDeck";
 
 import { storageGet, storageSet, request, Deck } from "./helpers";
 
 export default function Index() {
+  const navigation = useNavigation();
+
+  const [showModal, setShowModal] = useState(false);
   const [token, setToken] = useState("");
 
   const decks: Deck[] = [
@@ -31,7 +35,7 @@ export default function Index() {
 
     storageSet("decks", decks);
 
-    const jwt = await storageGet("jwt");
+    const jwt = storageGet<string>("jwt", true);
     if (jwt != null && jwt.length > 0) {
       setToken(jwt);
       return;
@@ -54,25 +58,21 @@ export default function Index() {
 
   useEffect(() => { authenticate(); }, []);
 
-  const createDeck = () => {};
-
-  const viewDeck = (index: number) => {
-    router.push({
-      pathname: "/deckViewer",
-      params: { index: index }
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      title: "Your decks",
+      headerRight: () => (
+        <Button
+          transparent
+          onPress={() => setShowModal(true)}
+          icon={<Plus color="blue" scale={1.5} />} />
+      )
     });
-  }
+  }, [navigation]);
 
   return (
     <YStack>
-      <XStack>
-        <H3>Your decks</H3>
-        <Button
-          marginLeft="auto"
-          onPress={createDeck}
-          icon={Plus}
-        />
-      </XStack>
+      {showModal && <CreateDeck setClose={() => setShowModal(false)} />}
 
       <YGroup alignSelf="center" bordered gap={10}>
         {decks.map((item, index) => (
@@ -83,7 +83,9 @@ export default function Index() {
               pressTheme
               title={item.name}
               iconAfter={ChevronRight}
-              onPress={() => viewDeck(index)}
+              onPress={() =>
+                router.push({pathname: "/deckViewer", params: {index}})
+              }
             />
           </YGroup.Item>
         ))}
@@ -91,6 +93,3 @@ export default function Index() {
     </YStack>
   );
 }
-
-const styles = StyleSheet.create({
-});
