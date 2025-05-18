@@ -26,10 +26,10 @@ type Message struct {
 }
 
 type Payload struct {
-	Model          string    `json:"model"`
-	UserId         string    `json:"user"`
-	Messages       []Message `json:"messages"`
-	ResponseFormat string    `json:"response_format"`
+	Model          string            `json:"model"`
+	UserId         string            `json:"user"`
+	Messages       []Message         `json:"messages"`
+	ResponseFormat map[string]string `json:"response_format"`
 }
 
 func parsePromptTemplate(path string, data any) (string, error) {
@@ -44,17 +44,22 @@ func parsePromptTemplate(path string, data any) (string, error) {
 	return output.String(), err
 }
 
+// This way, we can let the user parse the api response however they see fit
+type ResponseHandler[R any] func(map[string]any) (R, error)
+
 // Use the Groq api to prompt an LLM and return the potential LLM outputs
-func promptGroqLLM(payload Payload, apiKey string) ([]string, error) {
+func promptGroqLLM[R any](payload Payload, apiKey string, F ResponseHandler[R]) (R, error) {
+	var zero R
+
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
-		return nil, err
+		return zero, err
 	}
 
 	url := "https://api.groq.com/openai/v1/chat/completions"
 	request, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return nil, err
+		return zero, err
 	}
 
 	request.Header.Set("Content-Type", "application/json")
@@ -63,30 +68,20 @@ func promptGroqLLM(payload Payload, apiKey string) ([]string, error) {
 	client := &http.Client{}
 	response, err := client.Do(request)
 	if err != nil {
-		return nil, err
+		return zero, err
 	}
 	defer response.Body.Close()
 
 	responseBytes, err := io.ReadAll(response.Body)
 	if err != nil {
-		return nil, err
+		return zero, err
 	}
 
 	var responseJson map[string]any
 	err = json.Unmarshal(responseBytes, &responseJson)
 	if err != nil {
-		return nil, err
+		return zero, err
 	}
 
-	choices, _ := responseJson["choices"].([]any)
-	potentialResponses := []string{}
-
-	for _, option := range choices {
-		choice, _ := option.(map[string]any)
-		message, _ := choice["message"].(map[string]any)
-		content := message["content"].(string)
-		potentialResponses = append(potentialResponses, content)
-	}
-
-	return potentialResponses, nil
+	return F(responseJson)
 }

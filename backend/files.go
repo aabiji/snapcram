@@ -15,17 +15,17 @@ import (
 func createRandomFilename(userId, extension string) string {
 	timestamp := time.Now().Unix()
 	value := rand.IntN(1000)
-	return fmt.Sprintf("%s-%d-%d.%s", userId, timestamp, value, extension)
+	return fmt.Sprintf("%s-%d-%d%s", userId, timestamp, value, extension)
 }
 
 func readFileStore(filename string) (*os.File, error) {
-	path := filepath.Join("..", "data", filename)
+	path := filepath.Join("..", "data", "files", filename)
 	file, err := os.Open(path)
 	return file, err
 }
 
 func writeFileStore(file io.Reader, filename string) error {
-	path := filepath.Join("..", "data", filename)
+	path := filepath.Join("..", "data", "files", filename)
 
 	out, err := os.Create(path)
 	if err != nil {
@@ -66,7 +66,7 @@ func readBase64(file *os.File) (string, error) {
 	encoder.Close()
 
 	mimetype := ""
-	extension := filepath.Ext(file.Name())
+	extension := filepath.Ext(file.Name())[1:]
 	if extension == "png" {
 		mimetype = "image/png"
 	} else if extension == "jpg" || extension == "jpeg" {

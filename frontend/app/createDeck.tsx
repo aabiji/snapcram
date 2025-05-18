@@ -1,10 +1,8 @@
 import * as ImagePicker from "expo-image-picker";
 import { ImageInfo, request, storageGet } from "./helpers";
 
-import { useEffect, useState } from "react";
-import {
-  FlatList, Keyboard, KeyboardAvoidingView, Modal, StyleSheet, TouchableOpacity
-} from "react-native";
+import { useState } from "react";
+import { FlatList, Modal, StyleSheet, TouchableOpacity } from "react-native";
 
 import {
   Button, Image, Input, H3, Text, Spinner,
@@ -15,12 +13,11 @@ import { Plus, Redo } from "@tamagui/lucide-icons";
 enum States { UploadingImages, GeneratingCards, Error };
 
 function ModalContent() {
-  const [deckName, setDeckName] = useState("");
-  const [userPrompt, setUserPrompt] = useState("");
-  const [numCards, setNumCards] = useState("");
+  const [name, setName] = useState("Test");
+  const [userPrompt, setUserPrompt] = useState("nothing");
+  const [numCards, setNumCards] = useState(5);
 
   const [images, setImages] = useState<ImageInfo[]>([]);
-  const [fileIds, setFileIds] = useState<string[]>([]);
   const [state, setState] = useState(-1);
 
   const pickImage = async () => {
@@ -53,8 +50,7 @@ function ModalContent() {
       const json = await response.json();
 
       if (response.status == 200) {
-        setFileIds(json["files"]);
-        generateFlashcards();
+        generateFlashcards(json["files"]);
       } else {
         setState(States.Error);
       }
@@ -63,27 +59,25 @@ function ModalContent() {
     }
   }
 
-  const generateFlashcards = async () => {
+  const generateFlashcards = async (fileIds: string[]) => {
     setState(States.GeneratingCards);
 
     try {
       const token = storageGet<string>("jwt", true);
-      const payload = { deckName, userPrompt, numCards, fileIds };
+      const payload = { name, userPrompt, numCards, fileIds };
       const response = await request("POST", "/createDeck", payload, token);
       const json = await response.json();
 
       if (response.status == 200) {
         console.log("success!", json)
+        setState(-1);
       } else {
         setState(States.Error);
         console.log("error", json);
       }
     } catch (error) {
       setState(States.Error);
-      console.log("error", json);
     }
-
-    setState(-1);
   }
 
   const startCreationProcess = () => {
@@ -95,11 +89,10 @@ function ModalContent() {
     <>
       <YStack gap={15} height="92%">
         <YStack height="40%" gap={15}>
-          <Input onChangeText={setDeckName} height="25%" placeholder="Deck name" />
-          <Input onChangeText={setNumCards} height="25%" placeholder="# cards" />
+          <Input onChangeText={setName} height="25%" placeholder="Deck name" />
           <TextArea
             onChangeText={setUserPrompt}
-            height="50%"
+            height="75%"
             placeholder="Additional instructions (optional)"
           />
         </YStack>

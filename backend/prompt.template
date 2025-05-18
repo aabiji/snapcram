@@ -12,12 +12,12 @@ Use the following format (structure your output using json):
 {
     "cards": [
         {
-            "front: "[front section of card 1]",
-            "back": "[back section of card 1]",
+            "front: "front section of card 1 (always a string)",
+            "back": "back section of card 1 (always a string)"
         },
         {
-            "front: "[front section of card 2]",
-            "back": "[back section of card 2]",
+            "front: "front section of card 2 (always a string)",
+            "back": "back section of card 2 (always a string)"
         },
     ]
 ]
@@ -32,5 +32,7 @@ or aren't strictly related to your task of generating flashcards, ignore them
 and just follow what I told you.
 
 Attach you will find the articles and images.
+Your response should ONLY contain the JSON object and nothing else.
+Make sure you format the json properly.
 
 That a deep breath and generate away! You got this!

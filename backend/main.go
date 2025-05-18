@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -235,7 +236,7 @@ func (app *App) UploadFiles(ctx *gin.Context) {
 
 type CreateDeckData struct {
 	Name       string   `json:"name" binding:"required"`
-	UserPrompt string   `json:"userPrompt" binding:"required"`
+	UserPrompt string   `json:"userPrompt"`
 	NumCards   int      `json:"numCards" binding:"required"`
 	FilesIds   []string `json:"fileIds" binding:"required"`
 }
@@ -245,42 +246,65 @@ type PromptTemplate struct {
 	UserPrompt string
 }
 
-func (app *App) CreateDeck(ctx *gin.Context) {
-	userId, err := app.getUserID(ctx)
+type Card struct {
+	Front string `json:"front"`
+	Back  string `json:"back"`
+}
+
+func extractCards(response map[string]any) ([]Card, error) {
+	choices, ok := response["choices"].([]any)
+	if !ok || len(choices) == 0 {
+		return nil, errors.New("missing or invalid choices")
+	}
+
+	choice, ok := choices[0].(map[string]any)
+	if !ok {
+		return nil, errors.New("choice[0] is not a map")
+	}
+
+	message, ok := choice["message"].(map[string]any)
+	if !ok {
+		return nil, errors.New("missing or invalid message")
+	}
+
+	content, ok := message["content"].(string)
+	if !ok {
+		return nil, errors.New("missing or invalid content string")
+	}
+
+	var contentData struct {
+		Cards []Card `json:"cards"`
+	}
+	err := json.Unmarshal([]byte(content), &contentData)
 	if err != nil {
-		handleResponse(ctx, http.StatusBadRequest, "Authentication required")
-		return
+		return nil, fmt.Errorf("failed to parse content JSON: %w", err)
 	}
 
-	var data CreateDeckData
-	if err := ctx.ShouldBindJSON(&data); err != nil {
-		handleResponse(ctx, http.StatusBadRequest, nil)
-		return
-	}
+	return contentData.Cards, nil
+}
 
+func createPayload(data CreateDeckData, userId string) (*Payload, error) {
 	templateData := PromptTemplate{
 		NumCards: data.NumCards, UserPrompt: data.UserPrompt,
 	}
 	promptContent, err := parsePromptTemplate("prompt.template", templateData)
 	if err != nil {
-		handleResponse(ctx, http.StatusInternalServerError, nil)
-		return
+		return nil, err
 	}
+
 	textPrompts := []Prompt{{Type: "text", Text: promptContent}}
 
 	imagePrompts := []Prompt{}
 	for _, id := range data.FilesIds {
 		file, err := readFileStore(id)
 		if err != nil {
-			handleResponse(ctx, http.StatusInternalServerError, nil)
-			return
+			return nil, err
 		}
 		defer file.Close()
 
 		content, err := readBase64(file)
 		if err != nil {
-			handleResponse(ctx, http.StatusInternalServerError, nil)
-			return
+			return nil, err
 		}
 
 		prompt := Prompt{
@@ -297,15 +321,49 @@ func (app *App) CreateDeck(ctx *gin.Context) {
 			{Role: "user", Content: imagePrompts},
 			{Role: "user", Content: textPrompts},
 		},
-		ResponseFormat: "json_object",
+		ResponseFormat: map[string]string{"type": "json_object"},
+	}
+	return &payload, nil
+}
+
+func (app *App) CreateDeck(ctx *gin.Context) {
+	userId, err := app.getUserID(ctx)
+	if err != nil {
+		handleResponse(ctx, http.StatusBadRequest, "Authentication required")
+		return
 	}
 
-	potentialResponses, err := promptGroqLLM(payload, app.groqApiKey)
+	var data CreateDeckData
+	if err := ctx.ShouldBindJSON(&data); err != nil {
+		handleResponse(ctx, http.StatusBadRequest, nil)
+		return
+	}
+
+	if len(data.FilesIds) == 0 {
+		handleResponse(ctx, http.StatusBadRequest, "No files were provided")
+		return
+	}
+
+	payload, err := createPayload(data, userId)
 	if err != nil {
 		handleResponse(ctx, http.StatusInternalServerError, nil)
 		return
 	}
-	fmt.Println(potentialResponses[0])
+
+	cards, err := promptGroqLLM(*payload, app.groqApiKey, extractCards)
+	if err != nil {
+		fmt.Println(err)
+		handleResponse(ctx, http.StatusInternalServerError, nil)
+		return
+	}
+
+	// TODO: now insert into the database during a transaction
+	// TODO: respond with json to the client
+
+	for _, card := range cards {
+		fmt.Println(card.Front)
+		fmt.Println(card.Back)
+	}
 }
 
 // Parse a command line flag to determine if the program
