@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -33,23 +32,17 @@ func setupDB(path string) (*sql.DB, error) {
 	}
 
 	statement := `
-			create table if not exists Users (ID text not null);
-			create table if not exists Topics (
-				ID integer not null primary key,
-				UserID text not null,
-				Name text not null
-			);
-			create table if not exists Decks (
-				ID integer not null primary key,
-				TopicID integer not null,
-				Name text not null
-			);
-			create table if not exists Flashcards (
-				ID integer not null primary key,
-				DeckID integer not null,
-				Question text not null,
-				Answer text not null
-			);`
+		create table if not exists Users (ID text not null);
+		create table if not exists Decks (
+			ID integer not null primary key,
+			Name text not null
+		);
+		create table if not exists Flashcards (
+			ID integer not null primary key,
+			DeckID integer not null,
+			Front text not null,
+			Back text not null
+		);`
 	_, err = db.Exec(statement)
 	if err != nil {
 		return nil, err
@@ -59,7 +52,7 @@ func setupDB(path string) (*sql.DB, error) {
 }
 
 func NewApp(baseSecretsPath string) (App, error) {
-	db, err := setupDB("test.db")
+	db, err := setupDB(filepath.Join("..", "data", "database.db"))
 	if err != nil {
 		return App{}, err
 	}
@@ -86,7 +79,7 @@ func NewApp(baseSecretsPath string) (App, error) {
 	}
 	app.groqApiKey = string(data)
 
-	app.assetFolder = filepath.Join("..", "secrets", "images")
+	app.assetFolder = filepath.Join("..", "data", "images")
 
 	return app, nil
 }
@@ -157,7 +150,7 @@ func (app *App) getUserID(ctx *gin.Context) (string, error) {
 func (app *App) CreateUser(ctx *gin.Context) {
 	userId := uuid.NewString()
 
-	statement, err := app.db.Prepare("insert into Users (ID) values (?);")
+	statement, err := app.db.Prepare("insert into Users (ID) values (?)")
 	if err != nil {
 		handleResponse(ctx, http.StatusInternalServerError, nil)
 		return
@@ -179,68 +172,9 @@ func (app *App) CreateUser(ctx *gin.Context) {
 	handleResponse(ctx, http.StatusOK, response)
 }
 
-type CreateTopicData struct {
-	Name string `json:"name" binding:"required"`
-}
-
-// Create a new topic associated to the user. A topic
-// contains notes and flashcard decks
-func (app *App) CreateTopic(ctx *gin.Context) {
-	userId, err := app.getUserID(ctx)
-	if err != nil {
-		handleResponse(ctx, http.StatusBadRequest, "Authentication required")
-		return
-	}
-
-	var data CreateTopicData
-	if err := ctx.ShouldBindJSON(&data); err != nil {
-		handleResponse(ctx, http.StatusBadRequest, nil)
-		return
-	}
-
-	// Ensure that the topic hasn't already been created
-	exists, err :=
-		app.rowExists("select * from Topics where UserID=? and Name=?", userId, data.Name)
-	if err != nil {
-		handleResponse(ctx, http.StatusInternalServerError, nil)
-		return
-	}
-
-	if exists {
-		handleResponse(ctx, http.StatusNotAcceptable, "Topic has already been created")
-		return
-	}
-
-	// Insert a new row into the database
-	sqlStr := "insert into Topics (UserID, Name) values (?, ?)"
-	statement, err := app.db.Prepare(sqlStr)
-	if err != nil {
-		handleResponse(ctx, http.StatusInternalServerError, nil)
-		return
-	}
-
-	result, err := statement.Exec(userId, data.Name)
-	if err != nil {
-		handleResponse(ctx, http.StatusInternalServerError, nil)
-		return
-	}
-
-	topicId, err := result.LastInsertId()
-	if err != nil {
-		handleResponse(ctx, http.StatusInternalServerError, nil)
-		return
-	}
-
-	handleResponse(ctx, http.StatusOK, gin.H{"topicId": topicId})
-}
-
-type UploadNotesData struct {
-	TopicId string `json:"topicId" binding:"required"`
-}
-
 // Upload files that'll serve as context for the LLM
 // when it generates flashcards
-func (app *App) UploadNotes(ctx *gin.Context) {
+func (app *App) UploadFiles(ctx *gin.Context) {
 	userId, err := app.getUserID(ctx)
 	if err != nil {
 		handleResponse(ctx, http.StatusBadRequest, "Authentication required")
@@ -250,33 +184,6 @@ func (app *App) UploadNotes(ctx *gin.Context) {
 	form, err := ctx.MultipartForm()
 	if err != nil {
 		handleResponse(ctx, http.StatusBadRequest, nil)
-		return
-	}
-
-	// Parse the json payload that was sent along with the multipart form
-	var data UploadNotesData
-	attachments, ok := form.Value["payload"]
-	if !ok {
-		handleResponse(ctx, http.StatusBadRequest, "No attached json payload")
-		return
-	}
-
-	err = json.Unmarshal([]byte(attachments[0]), &data)
-	if err != nil {
-		handleResponse(ctx, http.StatusBadRequest, nil)
-		return
-	}
-
-	// Ensure the topic actually exists
-	exists, err :=
-		app.rowExists("select * from Topics where ID=?", data.TopicId)
-	if err != nil {
-		handleResponse(ctx, http.StatusInternalServerError, nil)
-		return
-	}
-
-	if !exists {
-		handleResponse(ctx, http.StatusNotAcceptable, "Topic not found")
 		return
 	}
 
@@ -301,7 +208,7 @@ func (app *App) UploadNotes(ctx *gin.Context) {
 			return
 		}
 
-		path := filepath.Join(app.assetFolder, userId, data.TopicId, file.Filename)
+		path := filepath.Join(app.assetFolder, userId, file.Filename)
 		ctx.SaveUploadedFile(file, path)
 	}
 
@@ -309,7 +216,6 @@ func (app *App) UploadNotes(ctx *gin.Context) {
 }
 
 type CreateDeckData struct {
-	TopicId    string `json:"topicId" binding:"required"`
 	Name       string `json:"name" binding:"required"`
 	UserPrompt string `json:"user_prompt" binding:"required"`
 	NumCards   int    `json:"num_cards" binding:"required"`
@@ -320,91 +226,59 @@ type PromptTemplate struct {
 	UserPrompt string
 }
 
-// TODO: test this (what am I missing??)
-// TODO: make sure the topic we're refering to actually exists
+/*
+Now comes the crux of the app -- creating decks.
 
-// Create a new flashcard deck associated to a user's topic
-// Use all the files associated to the topic as llm context
-// Then prompt the llm using the prompt template and the
-// additional user prompt. Then parse the flashcards and store
-// them in the database. Then return a json response containing
-// all the generated flashcards.
+3 step process (should split into multiple composable functions so it's more manageable):
+- Upload the notes (image files) that user has selected
+
+  When we upload files, each file gets tagged with an id.
+  We should respond with a list of the file ids to the client.
+
+  /uploadFiles -> {"files": ["fileid1", "fileid2", "fileid3"]}
+
+  file ids could just be the names of the files on disk,
+  that way we can verify if a file id is valid by just checking if
+  the user has a file going by that name
+
+  the file id could be: {user_id}-{unix timestamp}-{random number}.{file extension}
+  (also means that the assets folder can be flat -- no subdirectories)
+
+- Use the Groq api to prompt an llm that'll generate flashcards,
+  using the previously uploaded files,
+  and return the response in structured json:
+
+  validate the userid and json payload
+
+  readFromFileStore(fileId) -> os.File
+  readAsBase64(os.File) -> base64 string
+
+  then just create the payload using the structs
+
+  promptGrokLLM(payload) -> list of possible responses
+
+- Parse the json response, write the values into the database,
+  and return a json response to the client
+
+  json parse the first possible response, validate the json
+
+  populateDatabase():
+	start sql transaction
+	insert a new row into the decks table
+	insert new rows into the flashcards table
+
+  format and return the json response
+
+  /generateFlashcards, { "name": "", "user_prompt": "", "num_cards": 10, files: [...file ids] }
+  -> { "cards": [{"front": "", "back": ""}, ...] }
+
+So on the frontend side, after the user clicks "create deck":
+show loading screen -- "uploading notes..." then "generating flashcards..." then "almost done..."
+transition into the deck screen with the flashcards
+*/
+
 func (app *App) CreateDeck(ctx *gin.Context) {
-	userId, err := app.getUserID(ctx)
-	if err != nil {
-		handleResponse(ctx, http.StatusBadRequest, "Authentication required")
-		return
-	}
-
-	var data CreateDeckData
-	if err := ctx.ShouldBindJSON(&data); err != nil {
-		handleResponse(ctx, http.StatusBadRequest, nil)
-		return
-	}
-
-	/*
-		statement, err := app.db.Prepare("insert into Decks (TopicID, Name) values (?, ?)")
-		if err != nil {
-			handleResponse(ctx, http.StatusInternalServerError, nil)
-			return
-		}
-
-		result, err := statement.Exec(data.TopicId, data.Name)
-		if err != nil {
-			handleResponse(ctx, http.StatusInternalServerError, nil)
-			return
-		}
-
-		deckId, err := result.LastInsertId()
-		if err != nil {
-			handleResponse(ctx, http.StatusInternalServerError, nil)
-			return
-		}
-	*/
-
-	prompt, err := parsePromptTemplate("prompt.template", PromptTemplate{
-		NumCards: data.NumCards, UserPrompt: data.UserPrompt,
-	})
-	if err != nil {
-		handleResponse(ctx, http.StatusInternalServerError, nil)
-		return
-	}
-
-	userFolder := filepath.Join(app.assetFolder, userId, data.TopicId)
-	responses, err := promptWithFileContext(
-		userFolder, prompt, userId, app.groqApiKey,
-	)
-	if err != nil {
-		handleResponse(ctx, http.StatusInternalServerError, nil)
-		return
-	}
-	for _, r := range responses {
-		fmt.Println(r)
-	}
-
-	/*
-		// TODO: actually parse the llm's response to get all the flashcards
-
-		sqlStr := "insert into Flashcards (DeckID, Question, Answer) values (?, ?, ?)"
-		statement, err = app.db.Prepare(sqlStr)
-		if err != nil {
-			handleResponse(ctx, http.StatusInternalServerError, nil)
-			return
-		}
-
-		_, err = statement.Exec(deckId, "TODO!", responses[0])
-		if err != nil {
-			handleResponse(ctx, http.StatusInternalServerError, nil)
-			return
-		}
-	*/
-
-	response := map[string]any{
-		"message": "Success!",
-		//"flashcards": []string{responses[0]},
-		//"deckId": deckId,
-	}
-	handleResponse(ctx, http.StatusOK, response)
+	panic(fmt.Sprintf("TODO!"))
 }
 
 // Parse a command line flag to determine if the program
@@ -454,10 +328,8 @@ func main() {
 	server.MaxMultipartMemory = 10 << 20 // 10 MB upload max
 
 	server.POST("/createUser", app.CreateUser)
-	server.POST("/uploadNotes", app.UploadNotes)
-	server.POST("/createTopic", app.CreateTopic)
+	server.POST("/uploadFiles", app.UploadFiles)
 	server.POST("/createDeck", app.CreateDeck)
-	//server.GET("/getUserData", app.GetUserData)
 
 	if err := server.Run(); err != nil {
 		panic(err)

@@ -7,8 +7,6 @@ import (
 	"html/template"
 	"io"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 )
 
@@ -91,60 +89,4 @@ func promptGroqLLM(payload Payload, apiKey string) ([]string, error) {
 	}
 
 	return potentialResponses, nil
-}
-
-// Use the Groq api to prompt an LLM using the file prompts
-// and the text prompt and return the potential LLM outputs
-func promptWithFileContext(assetFolder, text, userId, apiKey string) ([]string, error) {
-
-	// TODO: batch requests since there's a prompt limit
-	// Can only have a maximum of 5 images per request
-	// Base64 image data should be <= 4 MB
-	// Images should have a 33 megapixel resolution limit
-
-	// TODO: support general purpose file prompts --
-	// set the base64 data mimetype based off the file's extension
-
-	entries, err := os.ReadDir(assetFolder)
-	if err != nil {
-		return nil, err
-	}
-
-	// Use each file in the folder as an image prompt
-	imagePrompts := []Prompt{}
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-
-		info, err := entry.Info()
-		if err != nil {
-			return nil, err
-		}
-
-		path := filepath.Join(assetFolder, info.Name())
-		base64, err := base64EncodeFile(path)
-		if err != nil {
-			return nil, err
-		}
-
-		imagePrompts = append(imagePrompts, Prompt{
-			Type: "image_url", Image: &ImageUrl{Url: base64},
-		})
-	}
-
-	textPrompt := Prompt{Type: "Text", Text: text}
-
-	payload := Payload{
-		Model:  "meta-llama/llama-4-scout-17b-16e-instruct",
-		UserId: userId,
-		Messages: []Message{
-			{Role: "user", Content: imagePrompts},
-			{Role: "user", Content: []Prompt{textPrompt}},
-		},
-		ResponseFormat: "json_object",
-	}
-
-	responses, err := promptGroqLLM(payload, apiKey)
-	return responses, err
 }
