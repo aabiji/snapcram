@@ -1,5 +1,5 @@
+import { router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
-import { ImageInfo, request, storageGet } from "./helpers";
 
 import { useState } from "react";
 import { FlatList, Modal, StyleSheet, TouchableOpacity } from "react-native";
@@ -10,12 +10,14 @@ import {
 } from "tamagui";
 import { Plus, Redo } from "@tamagui/lucide-icons";
 
+import { Deck, ImageInfo, request, storageGet, storageSet } from "./helpers";
+
 enum States { UploadingImages, GeneratingCards, Error };
 
-function ModalContent() {
-  const [name, setName] = useState("Test");
-  const [userPrompt, setUserPrompt] = useState("nothing");
-  const [numCards, setNumCards] = useState(5);
+function ModalContent({ setClose }: { setClose: () => void }) {
+  const [name, setName] = useState("");
+  const [userPrompt, setUserPrompt] = useState("");
+  const [numCards, setNumCards] = useState(0);
 
   const [images, setImages] = useState<ImageInfo[]>([]);
   const [state, setState] = useState(-1);
@@ -69,11 +71,14 @@ function ModalContent() {
       const json = await response.json();
 
       if (response.status == 200) {
-        console.log("success!", json)
-        setState(-1);
+        // Now show the deck we just created...
+        const list = storageGet<Deck[]>("decks") ?? [];
+        const index = list.length;
+        storageSet("decks", [...list, json]);
+        setClose();
+        router.push({pathname: "/deckViewer", params: {index}})
       } else {
         setState(States.Error);
-        console.log("error", json);
       }
     } catch (error) {
       setState(States.Error);
@@ -82,6 +87,7 @@ function ModalContent() {
 
   const startCreationProcess = () => {
     // TODO: validate form input
+    // TODO: change the border of the input causing trouble
     uploadImages();
   }
 
@@ -89,10 +95,16 @@ function ModalContent() {
     <>
       <YStack gap={15} height="92%">
         <YStack height="40%" gap={15}>
-          <Input onChangeText={setName} height="25%" placeholder="Deck name" />
+          <Input height="25%" placeholder="Deck name" />
+
+          <XStack alignItems="center" height="10%">
+            <Text width="80%" htmlFor="numCards" height="100%">Number of cards</Text>
+            <Input width="20%" id="numCards" placeholder="0" keyboardType="numeric" />
+          </XStack>
+
           <TextArea
             onChangeText={setUserPrompt}
-            height="75%"
+            height="55%"
             placeholder="Additional instructions (optional)"
           />
         </YStack>
@@ -157,8 +169,7 @@ function ModalContent() {
 }
 
 export default function CreateDeck({ setClose }: { setClose: () => void }) {
-  const height = useWindowDimensions().height * 0.85;
-
+  const height = useWindowDimensions().height * 0.9;
   return (
     <Modal
       transparent
@@ -174,7 +185,7 @@ export default function CreateDeck({ setClose }: { setClose: () => void }) {
           activeOpacity={1}
           style={{ ...styles.modal, height }}
         >
-          <ModalContent />
+          <ModalContent setClose={setClose} />
         </TouchableOpacity>
       </TouchableOpacity>
     </Modal>

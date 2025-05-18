@@ -7,7 +7,7 @@ import { router, useNavigation } from "expo-router";
 
 import CreateDeck from "./createDeck";
 
-import { storageGet, storageSet, storageRemove, request, Deck } from "./helpers";
+import { storageGet, storageSet, request, Deck } from "./helpers";
 
 export default function Index() {
   const navigation = useNavigation();
@@ -15,26 +15,9 @@ export default function Index() {
   const [showModal, setShowModal] = useState(false);
   const [token, setToken] = useState("");
 
-  const decks: Deck[] = [
-    {
-      name: "Test deck #1",
-      cards: [
-        { confident: false, front: "What is the capital city of Japan?", back: "Tokyo" },
-        { confident: false, front: "Who wrote the play Romeo and Juliet?", back: "William Shakespeare" },
-        { confident: false, front: "What is the largest planet in our solar system?", back: "Jupiter" },
-        { confident: false, front: "In what year did the Titanic sink?", back: "1912" },
-        { confident: false, front: "What element does 'O' represent on the periodic table?", back: "Oxygen" }
-      ]
-    },
-  ];
+  const decks = storageGet<Deck[]>("decks") ?? [];
 
   const authenticate = async () => {
-    // reset:
-    //await storageRemove("decks");
-    //await storageRemove("jwt");
-
-    storageSet("decks", decks);
-
     const jwt = storageGet<string>("jwt", true);
     if (jwt != null && jwt.length > 0) {
       setToken(jwt);

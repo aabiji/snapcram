@@ -32,10 +32,10 @@ export default function DeckViewer() {
 
   if (deck === undefined) return null;
 
-  // ex: did you know the info on the card, or should we
-  // keep showing you this card until you have it memorized?
   const setConfidence = (confident: boolean) => {
-    deck.cards[cardIndex].confident = confident;
+    // TODO: set the confidence for the card
+    // ex: did you know the info on the card, or should we
+    // keep showing you this card until you have it memorized?
 
     setDecks((prev: Deck[]) => {
       const copy = [...prev];

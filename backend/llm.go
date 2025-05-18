@@ -29,6 +29,7 @@ type Payload struct {
 	Model          string            `json:"model"`
 	UserId         string            `json:"user"`
 	Messages       []Message         `json:"messages"`
+	Temperature    float32           `json:"temperature"`
 	ResponseFormat map[string]string `json:"response_format"`
 }
 

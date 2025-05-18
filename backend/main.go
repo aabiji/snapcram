@@ -322,8 +322,47 @@ func createPayload(data CreateDeckData, userId string) (*Payload, error) {
 			{Role: "user", Content: textPrompts},
 		},
 		ResponseFormat: map[string]string{"type": "json_object"},
+		Temperature:    0.8,
 	}
 	return &payload, nil
+}
+
+func (app *App) insertRecords(deckName string, cards []Card) error {
+	_, err := app.db.Exec("begin transaction;")
+	if err != nil {
+		return err
+	}
+
+	statement, err := app.db.Prepare("insert into Decks (Name) values (?);")
+	if err != nil {
+		return err
+	}
+
+	result, err := statement.Exec(deckName)
+	if err != nil {
+		return err
+	}
+
+	deckId, err := result.LastInsertId()
+	if err != nil {
+		return err
+	}
+
+	for _, card := range cards {
+		str := "insert into Flashcards (DeckId, Front, Back) values (?, ?, ?);"
+		statement, err = app.db.Prepare(str)
+		if err != nil {
+			return err
+		}
+
+		_, err = statement.Exec(deckId, card.Front, card.Back)
+		if err != nil {
+			return err
+		}
+	}
+
+	_, err = app.db.Exec("commit;")
+	return err
 }
 
 func (app *App) CreateDeck(ctx *gin.Context) {
@@ -352,18 +391,18 @@ func (app *App) CreateDeck(ctx *gin.Context) {
 
 	cards, err := promptGroqLLM(*payload, app.groqApiKey, extractCards)
 	if err != nil {
-		fmt.Println(err)
 		handleResponse(ctx, http.StatusInternalServerError, nil)
 		return
 	}
 
-	// TODO: now insert into the database during a transaction
-	// TODO: respond with json to the client
-
-	for _, card := range cards {
-		fmt.Println(card.Front)
-		fmt.Println(card.Back)
+	err = app.insertRecords(data.Name, cards)
+	if err != nil {
+		handleResponse(ctx, http.StatusInternalServerError, nil)
+		return
 	}
+
+	response := map[string]any{"name": data.Name, "cards": cards}
+	handleResponse(ctx, http.StatusOK, response)
 }
 
 // Parse a command line flag to determine if the program

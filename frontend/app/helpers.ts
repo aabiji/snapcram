@@ -45,7 +45,7 @@ export async function request(
 }
 
 // -- Types
-export interface Flashcard { confident: boolean; front: string; back: string; }
+export interface Flashcard { front: string; back: string; }
 
 export interface Deck { name: string; cards: Flashcard[]; }
 
