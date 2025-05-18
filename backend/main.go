@@ -21,7 +21,6 @@ type App struct {
 	groqApiKey       string
 	fileUploadLimit  int64
 	fileSizeLimit    int64
-	assetFolder      string
 	allowedMimetypes []string
 }
 
@@ -66,20 +65,18 @@ func NewApp(baseSecretsPath string) (App, error) {
 
 	// Load the secrets
 	path := filepath.Join(baseSecretsPath, "jwt_secret")
-	data, err := readFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return App{}, err
 	}
 	app.jwtSecret = data
 
 	path = filepath.Join(baseSecretsPath, "groq_api_key")
-	data, err = readFile(path)
+	data, err = os.ReadFile(path)
 	if err != nil {
 		return App{}, err
 	}
 	app.groqApiKey = string(data)
-
-	app.assetFolder = filepath.Join("..", "data", "images")
 
 	return app, nil
 }
@@ -123,8 +120,11 @@ func (app *App) rowExists(query string, values ...any) (bool, error) {
 // ensure the user exists, then return it
 func (app *App) getUserID(ctx *gin.Context) (string, error) {
 	tokenStr := ctx.GetHeader("Authorization")
-	token, err := parseToken(tokenStr, app.jwtSecret)
+	if tokenStr[0] == '"' { // Remove quotes if present
+		tokenStr = tokenStr[1 : len(tokenStr)-1]
+	}
 
+	token, err := parseToken(tokenStr, app.jwtSecret)
 	if err != nil {
 		return "", fmt.Errorf("invalid json web token")
 	}
@@ -172,12 +172,11 @@ func (app *App) CreateUser(ctx *gin.Context) {
 	handleResponse(ctx, http.StatusOK, response)
 }
 
-// Upload files that'll serve as context for the LLM
-// when it generates flashcards
+// Upload files and respond with a list of corresponding file ids
 func (app *App) UploadFiles(ctx *gin.Context) {
 	userId, err := app.getUserID(ctx)
 	if err != nil {
-		handleResponse(ctx, http.StatusBadRequest, "Authentication required")
+		handleResponse(ctx, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -194,6 +193,7 @@ func (app *App) UploadFiles(ctx *gin.Context) {
 		return
 	}
 
+	fileIds := []string{}
 	for _, file := range files {
 		if file.Size > app.fileSizeLimit {
 			msg := fmt.Sprintf("%s: too big", file.Filename)
@@ -208,17 +208,36 @@ func (app *App) UploadFiles(ctx *gin.Context) {
 			return
 		}
 
-		path := filepath.Join(app.assetFolder, userId, file.Filename)
-		ctx.SaveUploadedFile(file, path)
+		extension := filepath.Ext(file.Filename)
+		filename := createRandomFilename(userId, extension)
+		fileIds = append(fileIds, filename)
+
+		osFile, err := file.Open()
+		if err != nil {
+			handleResponse(ctx, http.StatusInternalServerError, nil)
+			return
+		}
+		defer osFile.Close()
+
+		err = writeFileStore(osFile, filename)
+		if err != nil {
+			handleResponse(ctx, http.StatusInternalServerError, nil)
+			return
+		}
 	}
 
-	handleResponse(ctx, http.StatusOK, nil)
+	response := map[string]any{
+		"files":  fileIds,
+		"sucess": true,
+	}
+	handleResponse(ctx, http.StatusOK, response)
 }
 
 type CreateDeckData struct {
-	Name       string `json:"name" binding:"required"`
-	UserPrompt string `json:"user_prompt" binding:"required"`
-	NumCards   int    `json:"num_cards" binding:"required"`
+	Name       string   `json:"name" binding:"required"`
+	UserPrompt string   `json:"userPrompt" binding:"required"`
+	NumCards   int      `json:"numCards" binding:"required"`
+	FilesIds   []string `json:"fileIds" binding:"required"`
 }
 
 type PromptTemplate struct {
@@ -226,59 +245,67 @@ type PromptTemplate struct {
 	UserPrompt string
 }
 
-/*
-Now comes the crux of the app -- creating decks.
-
-3 step process (should split into multiple composable functions so it's more manageable):
-- Upload the notes (image files) that user has selected
-
-  When we upload files, each file gets tagged with an id.
-  We should respond with a list of the file ids to the client.
-
-  /uploadFiles -> {"files": ["fileid1", "fileid2", "fileid3"]}
-
-  file ids could just be the names of the files on disk,
-  that way we can verify if a file id is valid by just checking if
-  the user has a file going by that name
-
-  the file id could be: {user_id}-{unix timestamp}-{random number}.{file extension}
-  (also means that the assets folder can be flat -- no subdirectories)
-
-- Use the Groq api to prompt an llm that'll generate flashcards,
-  using the previously uploaded files,
-  and return the response in structured json:
-
-  validate the userid and json payload
-
-  readFromFileStore(fileId) -> os.File
-  readAsBase64(os.File) -> base64 string
-
-  then just create the payload using the structs
-
-  promptGrokLLM(payload) -> list of possible responses
-
-- Parse the json response, write the values into the database,
-  and return a json response to the client
-
-  json parse the first possible response, validate the json
-
-  populateDatabase():
-	start sql transaction
-	insert a new row into the decks table
-	insert new rows into the flashcards table
-
-  format and return the json response
-
-  /generateFlashcards, { "name": "", "user_prompt": "", "num_cards": 10, files: [...file ids] }
-  -> { "cards": [{"front": "", "back": ""}, ...] }
-
-So on the frontend side, after the user clicks "create deck":
-show loading screen -- "uploading notes..." then "generating flashcards..." then "almost done..."
-transition into the deck screen with the flashcards
-*/
-
 func (app *App) CreateDeck(ctx *gin.Context) {
-	panic(fmt.Sprintf("TODO!"))
+	userId, err := app.getUserID(ctx)
+	if err != nil {
+		handleResponse(ctx, http.StatusBadRequest, "Authentication required")
+		return
+	}
+
+	var data CreateDeckData
+	if err := ctx.ShouldBindJSON(&data); err != nil {
+		handleResponse(ctx, http.StatusBadRequest, nil)
+		return
+	}
+
+	templateData := PromptTemplate{
+		NumCards: data.NumCards, UserPrompt: data.UserPrompt,
+	}
+	promptContent, err := parsePromptTemplate("prompt.template", templateData)
+	if err != nil {
+		handleResponse(ctx, http.StatusInternalServerError, nil)
+		return
+	}
+	textPrompts := []Prompt{{Type: "text", Text: promptContent}}
+
+	imagePrompts := []Prompt{}
+	for _, id := range data.FilesIds {
+		file, err := readFileStore(id)
+		if err != nil {
+			handleResponse(ctx, http.StatusInternalServerError, nil)
+			return
+		}
+		defer file.Close()
+
+		content, err := readBase64(file)
+		if err != nil {
+			handleResponse(ctx, http.StatusInternalServerError, nil)
+			return
+		}
+
+		prompt := Prompt{
+			Type:  "image_url",
+			Image: &ImageUrl{Url: content},
+		}
+		imagePrompts = append(imagePrompts, prompt)
+	}
+
+	payload := Payload{
+		Model:  "meta-llama/llama-4-scout-17b-16e-instruct",
+		UserId: userId,
+		Messages: []Message{
+			{Role: "user", Content: imagePrompts},
+			{Role: "user", Content: textPrompts},
+		},
+		ResponseFormat: "json_object",
+	}
+
+	potentialResponses, err := promptGroqLLM(payload, app.groqApiKey)
+	if err != nil {
+		handleResponse(ctx, http.StatusInternalServerError, nil)
+		return
+	}
+	fmt.Println(potentialResponses[0])
 }
 
 // Parse a command line flag to determine if the program

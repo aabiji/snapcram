@@ -4,6 +4,9 @@ import * as SecureStore from "expo-secure-store";
 export const storageSet = (key: string, value: any) =>
   SecureStore.setItem(key, JSON.stringify(value));
 
+export const storageRemove = async (key: string) =>
+  SecureStore.deleteItemAsync(key);
+
 export function storageGet<T>(key: string, isString?: boolean): T | undefined {
   const str = SecureStore.getItem(key);
   if (str !== null)
@@ -28,16 +31,16 @@ export async function request(
   if (token !== undefined)
     headers["Authorization"] = token;
 
-  const isJson = payload !== undefined && typeof payload === "object";
+  const isForm = payload !== undefined && payload instanceof FormData;
 
-  if (isJson) {
+  if (payload !== undefined && !isForm) {
     headers["Accept"] = "application/json";
     headers["Content-Type"] = "application/json";
   }
 
   return await fetch(url, {
     method, headers,
-    body: isJson ? JSON.stringify(payload) : payload
+    body: isForm ? payload : JSON.stringify(payload)
   });
 }
 

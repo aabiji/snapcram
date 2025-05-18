@@ -4,19 +4,40 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
-// Read a file from a path
-func readFile(path string) ([]byte, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
+func createRandomFilename(userId, extension string) string {
+	timestamp := time.Now().Unix()
+	value := rand.IntN(1000)
+	return fmt.Sprintf("%s-%d-%d.%s", userId, timestamp, value, extension)
+}
 
+func readFileStore(filename string) (*os.File, error) {
+	path := filepath.Join("..", "data", filename)
+	file, err := os.Open(path)
+	return file, err
+}
+
+func writeFileStore(file io.Reader, filename string) error {
+	path := filepath.Join("..", "data", filename)
+
+	out, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, file)
+	return err
+}
+
+func readFileContents(file *os.File) ([]byte, error) {
 	fileInfo, err := file.Stat()
 	if err != nil {
 		return nil, err
@@ -33,8 +54,8 @@ func readFile(path string) ([]byte, error) {
 }
 
 // Read a file from a path and return its contents encoded in base64
-func base64EncodeFile(path string) (string, error) {
-	bytes, err := readFile(path)
+func readBase64(file *os.File) (string, error) {
+	bytes, err := readFileContents(file)
 	if err != nil {
 		return "", err
 	}
@@ -45,7 +66,7 @@ func base64EncodeFile(path string) (string, error) {
 	encoder.Close()
 
 	mimetype := ""
-	extension := filepath.Ext(path)
+	extension := filepath.Ext(file.Name())
 	if extension == "png" {
 		mimetype = "image/png"
 	} else if extension == "jpg" || extension == "jpeg" {

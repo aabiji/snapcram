@@ -7,7 +7,7 @@ import { router, useNavigation } from "expo-router";
 
 import CreateDeck from "./createDeck";
 
-import { storageGet, storageSet, request, Deck } from "./helpers";
+import { storageGet, storageSet, storageRemove, request, Deck } from "./helpers";
 
 export default function Index() {
   const navigation = useNavigation();
@@ -30,8 +30,8 @@ export default function Index() {
 
   const authenticate = async () => {
     // reset:
-    //deleteItemAsync("decks");
-    //deleteItemAsync("jwt");
+    //await storageRemove("decks");
+    //await storageRemove("jwt");
 
     storageSet("decks", decks);
 
@@ -46,7 +46,7 @@ export default function Index() {
 
       if (response.status == 200) {
         const json = await response.json();
-        storageSet("jwt", json["token"])
+        storageSet("jwt", json["token"]);
         setToken(json["token"]);
       } else {
         console.log("Request failed", response.status, response?.toString());

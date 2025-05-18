@@ -1,19 +1,27 @@
 import * as ImagePicker from "expo-image-picker";
-import { ImageInfo } from "./helpers";
+import { ImageInfo, request, storageGet } from "./helpers";
 
 import { useEffect, useState } from "react";
 import {
-  FlatList, Keyboard, Modal, StyleSheet, TouchableOpacity
+  FlatList, Keyboard, KeyboardAvoidingView, Modal, StyleSheet, TouchableOpacity
 } from "react-native";
 
 import {
-  Button, Image, Input, Text, TextArea,
-  useWindowDimensions, XStack, YStack
+  Button, Image, Input, H3, Text, Spinner,
+  TextArea, useWindowDimensions, XStack, YStack,
 } from "tamagui";
-import { Plus } from "@tamagui/lucide-icons";
+import { Plus, Redo } from "@tamagui/lucide-icons";
+
+enum States { UploadingImages, GeneratingCards, Error };
 
 function ModalContent() {
+  const [deckName, setDeckName] = useState("");
+  const [userPrompt, setUserPrompt] = useState("");
+  const [numCards, setNumCards] = useState("");
+
   const [images, setImages] = useState<ImageInfo[]>([]);
+  const [fileIds, setFileIds] = useState<string[]>([]);
+  const [state, setState] = useState(-1);
 
   const pickImage = async () => {
     const opts: ImagePicker.ImagePickerOptions = { mediaTypes: ["images"] };
@@ -26,17 +34,75 @@ function ModalContent() {
                             uri: asset.uri!, mimetype: asset.mimeType!
                           }));
     setImages(prev => [...prev, ...selection]);
-  };
+  }
 
+  const uploadImages = async () => {
+    setState(States.UploadingImages);
 
-  return (
-    <YStack padding={15}>
+    // Add the files
+    const formData = new FormData();
+    for (let image of images) {
+      formData.append("files", {
+        uri: image.uri, type: image.mimetype, name: image.uri
+      });
+    }
 
+    try {
+      const token = storageGet<string>("jwt", true);
+      const response = await request("POST", "/uploadFiles", formData, token);
+      const json = await response.json();
+
+      if (response.status == 200) {
+        setFileIds(json["files"]);
+        generateFlashcards();
+      } else {
+        setState(States.Error);
+      }
+    } catch (error) {
+      setState(States.Error);
+    }
+  }
+
+  const generateFlashcards = async () => {
+    setState(States.GeneratingCards);
+
+    try {
+      const token = storageGet<string>("jwt", true);
+      const payload = { deckName, userPrompt, numCards, fileIds };
+      const response = await request("POST", "/createDeck", payload, token);
+      const json = await response.json();
+
+      if (response.status == 200) {
+        console.log("success!", json)
+      } else {
+        setState(States.Error);
+        console.log("error", json);
+      }
+    } catch (error) {
+      setState(States.Error);
+      console.log("error", json);
+    }
+
+    setState(-1);
+  }
+
+  const startCreationProcess = () => {
+    // TODO: validate form input
+    uploadImages();
+  }
+
+  const Form = () => (
+    <>
       <YStack gap={15} height="92%">
         <YStack height="40%" gap={15}>
-          <Input height="25%" placeholder="Deck name" />
-          <TextArea height="75%" placeholder="Additional instructions (optional)" />
-          </YStack>
+          <Input onChangeText={setDeckName} height="25%" placeholder="Deck name" />
+          <Input onChangeText={setNumCards} height="25%" placeholder="# cards" />
+          <TextArea
+            onChangeText={setUserPrompt}
+            height="50%"
+            placeholder="Additional instructions (optional)"
+          />
+        </YStack>
 
         <YStack flex={3}>
           <XStack justifyContent="space-between" alignItems="center">
@@ -56,26 +122,54 @@ function ModalContent() {
         </YStack>
       </YStack>
 
-      <Button themeInverse style={styles.button}>Create deck</Button>
+      <Button
+        themeInverse
+        onPress={startCreationProcess}
+        style={styles.button}
+      >
+        Create deck
+      </Button>
+    </>
+  );
+
+  return (
+    <YStack padding={15}>
+      {state == -1 && <Form />}
+
+      {state == States.Error &&
+        <>
+          <H3>Something went wrong :(</H3>
+          <Button
+            onPress={() => setState(-1)}
+            themeInverse
+            iconAfter={<Redo rotate="180deg" />}
+          >
+            Retry
+          </Button>
+        </>
+      }
+
+      {state != -1 && state != States.Error &&
+        <>
+          <H3>
+            {state == States.UploadingImages
+              ? "Uploading your notes..."
+              : "Generating flashcards..."
+            }</H3>
+          <Spinner size="large" color="$blue10Light" />
+        </>
+      }
     </YStack>
   );
 }
 
 export default function CreateDeck({ setClose }: { setClose: () => void }) {
-  const [top, setTop] = useState(0);
   const height = useWindowDimensions().height * 0.85;
-
-  // Overlay the keyboard on top of the modal, instead of squishing it up
-  useEffect(() => {
-    Keyboard.addListener("keyboardDidShow", () => setTop(20));
-    Keyboard.addListener("keyboardDidHide", () => setTop(0));
-  }, []);
 
   return (
     <Modal
       transparent
       statusBarTranslucent
-      keyboardShouldPersistTaps
       onRequestClose={setClose}
       >
       <TouchableOpacity
@@ -85,7 +179,7 @@ export default function CreateDeck({ setClose }: { setClose: () => void }) {
       >
         <TouchableOpacity
           activeOpacity={1}
-          style={{ ...styles.modal, height, top }}
+          style={{ ...styles.modal, height }}
         >
           <ModalContent />
         </TouchableOpacity>
@@ -122,6 +216,7 @@ const styles = StyleSheet.create({
     width: "88%",
     borderRadius: 10,
     backgroundColor: "white",
+    top: 0
   },
   modalContainer: {
     flex: 1,
