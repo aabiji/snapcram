@@ -1,7 +1,7 @@
 import { router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FlatList, Modal, StyleSheet, TouchableOpacity } from "react-native";
 
 import {
@@ -18,9 +18,17 @@ function ModalContent({ setClose }: { setClose: () => void }) {
   const [name, setName] = useState("");
   const [userPrompt, setUserPrompt] = useState("");
   const [numCards, setNumCards] = useState(0);
-
   const [images, setImages] = useState<ImageInfo[]>([]);
   const [state, setState] = useState(-1);
+
+  const [nameBorder, setNameBorder] = useState(undefined);
+  const [numCardsBorder, setNumCardsBorder] = useState(undefined);
+  const [imagesBorder, setImagesBorder] = useState(undefined);
+
+  const updateNumCards = (text: string) => {
+    const num = Math.round(Number(text));
+    setNumCards(Math.min(num, 20));
+  }
 
   const pickImage = async () => {
     const opts: ImagePicker.ImagePickerOptions = { mediaTypes: ["images"] };
@@ -64,9 +72,13 @@ function ModalContent({ setClose }: { setClose: () => void }) {
   const generateFlashcards = async (fileIds: string[]) => {
     setState(States.GeneratingCards);
 
+    const prompt = userPrompt.trim().length == 0
+      ? "Nothing from me."
+      : userPrompt.trim();
+
     try {
       const token = storageGet<string>("jwt", true);
-      const payload = { name, userPrompt, numCards, fileIds };
+      const payload = { name: name.trim(), userPrompt: prompt, numCards, fileIds };
       const response = await request("POST", "/createDeck", payload, token);
       const json = await response.json();
 
@@ -86,60 +98,95 @@ function ModalContent({ setClose }: { setClose: () => void }) {
   }
 
   const startCreationProcess = () => {
-    // TODO: validate form input
-    // TODO: change the border of the input causing trouble
+    // Validate the form...
+    if (name.trim().length == 0) {
+      setNameBorder("red");
+      return;
+    } else {
+      setNameBorder(undefined);
+    }
+
+    if (numCards == 0) {
+      setNumCardsBorder("red");
+      return;
+    } else {
+      setNumCardsBorder(undefined);
+    }
+
+    if (images.length == 0) {
+      setImagesBorder("red");
+      return;
+    } else {
+      setImagesBorder(undefined);
+    }
+
     uploadImages();
   }
 
-  const Form = () => (
-    <>
-      <YStack gap={15} height="92%">
-        <YStack height="40%" gap={15}>
-          <Input height="25%" placeholder="Deck name" />
-
-          <XStack alignItems="center" height="10%">
-            <Text width="80%" htmlFor="numCards" height="100%">Number of cards</Text>
-            <Input width="20%" id="numCards" placeholder="0" keyboardType="numeric" />
-          </XStack>
-
-          <TextArea
-            onChangeText={setUserPrompt}
-            height="55%"
-            placeholder="Additional instructions (optional)"
-          />
-        </YStack>
-
-        <YStack flex={3}>
-          <XStack justifyContent="space-between" alignItems="center">
-            <Text> Choose images </Text>
-            <Button transparent icon={<Plus scale={1.5} />} onPress={pickImage} />
-          </XStack>
-
-          <FlatList
-            data={images}
-            style={styles.grid}
-            contentContainerStyle={styles.imageContainer}
-            numColumns={3}
-            renderItem={({ item }) => (
-              <Image style={styles.gridItem} source={{ uri: item.uri }} />
-            )}
-          />
-        </YStack>
-      </YStack>
-
-      <Button
-        themeInverse
-        onPress={startCreationProcess}
-        style={styles.button}
-      >
-        Create deck
-      </Button>
-    </>
-  );
+  useEffect(() => {
+    console.log(numCards);
+  }, [numCards]);
 
   return (
     <YStack padding={15}>
-      {state == -1 && <Form />}
+      {state == -1 &&
+        <>
+          <YStack gap={15} height="92%">
+            <YStack height="40%" gap={15}>
+              <Input
+                onChangeText={setName}
+                height="25%" placeholder="Deck name"
+                borderColor={nameBorder}
+              />
+
+              <XStack alignItems="center" height="10%">
+                <Text width="80%" htmlFor="numCards" height="100%">Number of cards</Text>
+                <Input
+                  width="20%" id="numCards"
+                  value={`${numCards == 0 ? "" : numCards}`}
+                  placeholder="0" keyboardType="numeric"
+                  onChangeText={updateNumCards}
+                  borderColor={numCardsBorder}
+                />
+              </XStack>
+
+              <TextArea
+                height="55%"
+                onChangeText={setUserPrompt}
+                placeholder="Additional instructions (optional)"
+              />
+            </YStack>
+
+            <YStack flex={3}>
+              <XStack justifyContent="space-between" alignItems="center">
+                <Text> Choose images </Text>
+                <Button transparent icon={<Plus scale={1.5} />} onPress={pickImage} />
+              </XStack>
+
+              <FlatList
+                data={images}
+                style={styles.grid}
+                contentContainerStyle={{
+                  ...styles.imageContainer,
+                  borderColor: imagesBorder
+                }}
+                numColumns={3}
+                renderItem={({ item }) => (
+                  <Image style={styles.gridItem} source={{ uri: item.uri }} />
+                )}
+              />
+            </YStack>
+          </YStack>
+
+          <Button
+            themeInverse
+            onPress={startCreationProcess}
+            style={styles.button}
+          >
+            Create deck
+          </Button>
+        </>
+      }
 
       {state == States.Error &&
         <>
