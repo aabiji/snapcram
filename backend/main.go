@@ -35,6 +35,7 @@ func setupDB(path string) (*sql.DB, error) {
 		create table if not exists Users (ID text not null);
 		create table if not exists Decks (
 			ID integer not null primary key,
+			UserID text not null,
 			Name text not null
 		);
 		create table if not exists Flashcards (
@@ -218,13 +219,15 @@ func (app *App) UploadFiles(ctx *gin.Context) {
 			handleResponse(ctx, http.StatusInternalServerError, nil)
 			return
 		}
-		defer osFile.Close()
 
 		err = writeFileStore(osFile, filename)
 		if err != nil {
+			osFile.Close()
 			handleResponse(ctx, http.StatusInternalServerError, nil)
 			return
 		}
+
+		osFile.Close()
 	}
 
 	response := map[string]any{
@@ -249,6 +252,11 @@ type PromptTemplate struct {
 type Card struct {
 	Front string `json:"front"`
 	Back  string `json:"back"`
+}
+
+type Deck struct {
+	Name string `json:"name"`
+	Cards []Card `json:"cards"`
 }
 
 func extractCards(response map[string]any) ([]Card, error) {
@@ -300,12 +308,14 @@ func createPayload(data CreateDeckData, userId string) (*Payload, error) {
 		if err != nil {
 			return nil, err
 		}
-		defer file.Close()
 
 		content, err := readBase64(file)
 		if err != nil {
+			file.Close()
 			return nil, err
 		}
+
+		file.Close()
 
 		prompt := Prompt{
 			Type:  "image_url",
@@ -327,18 +337,18 @@ func createPayload(data CreateDeckData, userId string) (*Payload, error) {
 	return &payload, nil
 }
 
-func (app *App) insertRecords(deckName string, cards []Card) error {
+func (app *App) insertRecords(cards []Card, userId, deckName string) error {
 	_, err := app.db.Exec("begin transaction;")
 	if err != nil {
 		return err
 	}
 
-	statement, err := app.db.Prepare("insert into Decks (Name) values (?);")
+	statement, err := app.db.Prepare("insert into Decks (UserId, Name) values (?, ?);")
 	if err != nil {
 		return err
 	}
 
-	result, err := statement.Exec(deckName)
+	result, err := statement.Exec(userId, deckName)
 	if err != nil {
 		return err
 	}
@@ -365,6 +375,9 @@ func (app *App) insertRecords(deckName string, cards []Card) error {
 	return err
 }
 
+// Create a new flashcard deck. Use the supplied files and the additional user prompt
+// and make an llm generate new flashcards (via the groq api). Return info
+// on the newly created deck
 func (app *App) CreateDeck(ctx *gin.Context) {
 	userId, err := app.getUserID(ctx)
 	if err != nil {
@@ -395,13 +408,79 @@ func (app *App) CreateDeck(ctx *gin.Context) {
 		return
 	}
 
-	err = app.insertRecords(data.Name, cards)
+	err = app.insertRecords(cards, userId, data.Name)
 	if err != nil {
 		handleResponse(ctx, http.StatusInternalServerError, nil)
 		return
 	}
 
 	response := map[string]any{"name": data.Name, "cards": cards}
+	handleResponse(ctx, http.StatusOK, response)
+}
+
+func (app *App) getUserDecks(userId string) ([]Deck, error) {
+	deckQuery, err := app.db.Prepare("select ID, Name from Decks where UserID = ?")
+	if err != nil {
+		return nil, err
+	}
+
+	deckRows, err := deckQuery.Query(userId)
+	if err != nil {
+		return nil, err
+	}
+	defer deckRows.Close()
+
+	decks := []Deck{}
+	for deckRows.Next() {
+		var deckId, deckName string	
+		if err := deckRows.Scan(&deckId, &deckName); err != nil {
+			return nil, err
+		}
+
+		cardQuery, err :=
+			app.db.Prepare("select Front, Back from Flashcards where DeckID = ?")
+		if err != nil {
+			return nil, err
+		}
+
+		cardRows, err := cardQuery.Query(deckId)
+		if err != nil {
+			return nil, err
+		}
+
+		cards := []Card{}
+		for cardRows.Next() {
+			var cardFront, cardBack string
+			if err := cardRows.Scan(&cardFront, &cardBack); err != nil {
+				cardRows.Close()
+				return nil, err
+			}
+			cards = append(cards, Card{ Front: cardFront, Back: cardBack })
+		}
+
+		cardRows.Close()
+		decks = append(decks, Deck{ Name: deckName, Cards: cards })
+	}
+
+	return decks, nil
+}
+
+// Response with all of the user's decks
+func (app *App) GetUserInfo(ctx *gin.Context) {
+	userId, err := app.getUserID(ctx)
+	if err != nil {
+		handleResponse(ctx, http.StatusBadRequest, "Authentication required")
+		return
+	}
+
+	decks, err := app.getUserDecks(userId)
+	if err != nil {
+		fmt.Println(err)
+		handleResponse(ctx, http.StatusInternalServerError, nil)
+		return
+	}
+
+	response := map[string]any{"decks": decks}
 	handleResponse(ctx, http.StatusOK, response)
 }
 
@@ -454,6 +533,7 @@ func main() {
 	server.POST("/createUser", app.CreateUser)
 	server.POST("/uploadFiles", app.UploadFiles)
 	server.POST("/createDeck", app.CreateDeck)
+	server.GET("/userInfo", app.GetUserInfo)
 
 	if err := server.Run(); err != nil {
 		panic(err)

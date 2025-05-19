@@ -11,9 +11,7 @@ Tech stack:
 
 TODO:
 - film devlog
-- setting the borders in the createDeck component is very buggy
 - polish the flashcards page
-- start researching spaced repitition algorithms
 - polish the flashcard decks page
 - refactor the createDeck component
 - style the loading screens
@@ -25,6 +23,7 @@ TODO:
 - look into cloud storage
 - revamp this readme
 - ship and talk to them about getting a visa letter (let's see where that goes)
+- export the flashcards to anki
 
 Run the frontend:
 ```bash

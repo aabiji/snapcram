@@ -1,7 +1,7 @@
 import { router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { FlatList, Modal, StyleSheet, TouchableOpacity } from "react-native";
 
 import {
@@ -14,16 +14,18 @@ import { Deck, ImageInfo, request, storageGet, storageSet } from "./helpers";
 
 enum States { UploadingImages, GeneratingCards, Error };
 
-function ModalContent({ setClose }: { setClose: () => void }) {
+function ModalContent(
+  { setClose, setDecks }: { setClose: () => void, setDecks: React.SetStateAction<Deck[]> }
+) {
   const [name, setName] = useState("");
   const [userPrompt, setUserPrompt] = useState("");
   const [numCards, setNumCards] = useState(0);
   const [images, setImages] = useState<ImageInfo[]>([]);
   const [state, setState] = useState(-1);
 
-  const [nameBorder, setNameBorder] = useState(undefined);
-  const [numCardsBorder, setNumCardsBorder] = useState(undefined);
-  const [imagesBorder, setImagesBorder] = useState(undefined);
+  const [nameBorder, setNameBorder] = useState("grey");
+  const [numCardsBorder, setNumCardsBorder] = useState("grey");
+  const [imagesBorder, setImagesBorder] = useState("grey");
 
   const updateNumCards = (text: string) => {
     const num = Math.round(Number(text));
@@ -87,6 +89,7 @@ function ModalContent({ setClose }: { setClose: () => void }) {
         const list = storageGet<Deck[]>("decks") ?? [];
         const index = list.length;
         storageSet("decks", [...list, json]);
+        setDecks([...list, json]);
         setClose();
         router.push({pathname: "/deckViewer", params: {index}})
       } else {
@@ -98,34 +101,17 @@ function ModalContent({ setClose }: { setClose: () => void }) {
   }
 
   const startCreationProcess = () => {
-    // Validate the form...
-    if (name.trim().length == 0) {
-      setNameBorder("red");
-      return;
-    } else {
-      setNameBorder(undefined);
-    }
+    const nameEmpty = name.trim().length == 0;
+    const cardsEmpty = numCards == 0;
+    const imagesEmpty = images.length == 0;
 
-    if (numCards == 0) {
-      setNumCardsBorder("red");
-      return;
-    } else {
-      setNumCardsBorder(undefined);
-    }
+    setNameBorder(nameEmpty ? "red" : "grey");
+    setNumCardsBorder(cardsEmpty ? "red" : "grey");
+    setImagesBorder(imagesEmpty ? "red" : "grey");
 
-    if (images.length == 0) {
-      setImagesBorder("red");
-      return;
-    } else {
-      setImagesBorder(undefined);
-    }
-
-    uploadImages();
+    if (!nameEmpty && !cardsEmpty && !imagesEmpty)
+      uploadImages();
   }
-
-  useEffect(() => {
-    console.log(numCards);
-  }, [numCards]);
 
   return (
     <YStack padding={15}>
@@ -215,7 +201,9 @@ function ModalContent({ setClose }: { setClose: () => void }) {
   );
 }
 
-export default function CreateDeck({ setClose }: { setClose: () => void }) {
+export default function CreateDeck(
+  { setClose, setDecks }: { setClose: () => void, setDecks: React.SetStateAction<Deck[]> }
+) {
   const height = useWindowDimensions().height * 0.9;
   return (
     <Modal
@@ -232,7 +220,7 @@ export default function CreateDeck({ setClose }: { setClose: () => void }) {
           activeOpacity={1}
           style={{ ...styles.modal, height }}
         >
-          <ModalContent setClose={setClose} />
+          <ModalContent setClose={setClose} setDecks={setDecks} />
         </TouchableOpacity>
       </TouchableOpacity>
     </Modal>
