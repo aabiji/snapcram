@@ -3,7 +3,7 @@ import { useLocalSearchParams, useNavigation } from "expo-router";
 import { useLayoutEffect, useState } from "react";
 import { StyleSheet } from "react-native";
 
-import { Button, H4, Text, View, XStack, YStack } from "tamagui";
+import { Button, Card, H3, Text, View, XStack, YStack } from "tamagui";
 import { Check, X, Redo } from "@tamagui/lucide-icons";
 
 import { storageGet, storageSet, Deck } from "./helpers";
@@ -57,36 +57,41 @@ export default function DeckViewer() {
 
   return (
     <YStack style={styles.container}>
-      <H4 alignSelf="center">
-        {cardIndex + 1}/{deck.cards.length}
-      </H4>
-
-      {done &&
-        <Button
-          onPress={restart}
-          icon={<Redo scale={2} color="blue" />}
-        >
-          Restart
-        </Button>
-      }
+      <YStack>
+        {done &&
+          <Button transparent onPress={restart}>
+            <Redo scale={2} color="blue" />
+            Restart
+          </Button>
+        }
+      </YStack>
 
       {!done &&
-        <View>
-          <View
+        <View height="100%">
+          <Card
+            elevate bordered
             style={styles.flaschard}
             onPress={() => setShowFront(!showFront)}
           >
-            {showFront && <Text>{deck.cards[cardIndex].front}</Text>}
-            {!showFront && <Text>{deck.cards[cardIndex].back}</Text>}
-          </View>
+            <H3 textAlign="center" fontWeight="bold">
+              {
+                showFront
+                  ? deck.cards[cardIndex].front
+                  : deck.cards[cardIndex].back
+              }
+            </H3>
+          </Card>
 
           <XStack style={styles.controls}>
-            <Button
-              icon={<X color="red" />}
+            <Button transparent
+              icon={<X color="red" scale={2.5} />}
               onPress={() => setConfidence(false)}
             />
-            <Button
-              icon={<Check color="green" />}
+            <Text>
+              {cardIndex + 1}/{deck.cards.length}
+            </Text>
+            <Button transparent
+              icon={<Check color="green" scale={2.5} />}
               onPress={() => setConfidence(true)}
             />
           </XStack>
@@ -98,21 +103,22 @@ export default function DeckViewer() {
 
 const styles = StyleSheet.create({
   flaschard: {
-    width: "100%",
-    height: "50%",
+    width: "85%",
+    height: "75%",
+    alignSelf: "center",
+    backgroundColor: "white",
     justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "white"
+    flex: 1,
   },
   controls: {
-    height: "auto",
+    width: "80%",
+    height: "25%",
+    marginTop: "-15%",
     alignItems: "center",
-    width: "40%",
     justifyContent: "space-between",
-    alignSelf: "center"
+    alignSelf: "center",
   },
   container: {
     flex: 1,
-    justifyContent: "center"
   }
 });
