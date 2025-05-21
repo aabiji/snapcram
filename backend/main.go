@@ -16,6 +16,9 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+// TODO: refactor this into multiple files
+// TODO: use .env file instead of secrets! (both in docker and in dev)
+
 type App struct {
 	db               *sql.DB
 	jwtSecret        []byte
@@ -255,7 +258,7 @@ type Card struct {
 }
 
 type Deck struct {
-	Name string `json:"name"`
+	Name  string `json:"name"`
 	Cards []Card `json:"cards"`
 }
 
@@ -432,7 +435,7 @@ func (app *App) getUserDecks(userId string) ([]Deck, error) {
 
 	decks := []Deck{}
 	for deckRows.Next() {
-		var deckId, deckName string	
+		var deckId, deckName string
 		if err := deckRows.Scan(&deckId, &deckName); err != nil {
 			return nil, err
 		}
@@ -455,11 +458,11 @@ func (app *App) getUserDecks(userId string) ([]Deck, error) {
 				cardRows.Close()
 				return nil, err
 			}
-			cards = append(cards, Card{ Front: cardFront, Back: cardBack })
+			cards = append(cards, Card{Front: cardFront, Back: cardBack})
 		}
 
 		cardRows.Close()
-		decks = append(decks, Deck{ Name: deckName, Cards: cards })
+		decks = append(decks, Deck{Name: deckName, Cards: cards})
 	}
 
 	return decks, nil
