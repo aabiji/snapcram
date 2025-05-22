@@ -3,14 +3,18 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"math/rand/v2"
 	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -38,9 +42,6 @@ func loadSecrets(envFile string) (map[string]string, error) {
 
 	return values, nil
 }
-
-// TODO: write a helper function to load .env file
-// TODO: refactor this into multiple files
 
 type App struct {
 	db               *sql.DB
@@ -196,6 +197,12 @@ func (app *App) CreateUser(ctx *gin.Context) {
 	handleResponse(ctx, http.StatusOK, response)
 }
 
+func createRandomFilename(userId, extension string) string {
+	timestamp := time.Now().Unix()
+	value := rand.IntN(1000)
+	return fmt.Sprintf("%s-%d-%d%s", userId, timestamp, value, extension)
+}
+
 // Upload files and respond with a list of corresponding file ids
 func (app *App) UploadFiles(ctx *gin.Context) {
 	userId, err := app.getUserID(ctx)
@@ -236,20 +243,20 @@ func (app *App) UploadFiles(ctx *gin.Context) {
 		filename := createRandomFilename(userId, extension)
 		fileIds = append(fileIds, filename)
 
-		osFile, err := file.Open()
+		reader, err := file.Open()
 		if err != nil {
 			handleResponse(ctx, http.StatusInternalServerError, nil)
 			return
 		}
 
-		err = writeFileStore(osFile, filename)
+		err = app.storage.UploadFile(context.TODO(), reader, filename)
 		if err != nil {
-			osFile.Close()
+			reader.Close()
 			handleResponse(ctx, http.StatusInternalServerError, nil)
 			return
 		}
 
-		osFile.Close()
+		reader.Close()
 	}
 
 	response := map[string]any{
@@ -313,7 +320,23 @@ func extractCards(response map[string]any) ([]Card, error) {
 	return contentData.Cards, nil
 }
 
-func createPayload(data CreateDeckData, userId string) (*Payload, error) {
+// Read a file from a path and return its contents encoded in base64
+func base64EncodeFile(file io.Reader, mimetype string) (string, error) {
+	bytes, err := io.ReadAll(file)
+	if err != nil {
+		return "", err
+	}
+
+	builder := &strings.Builder{}
+	encoder := base64.NewEncoder(base64.StdEncoding, builder)
+	encoder.Write(bytes)
+	encoder.Close()
+
+	formatted := fmt.Sprintf("data:%s;base64,%s", mimetype, builder.String())
+	return formatted, nil
+}
+
+func (app *App) createPayload(data CreateDeckData, userId string) (*Payload, error) {
 	templateData := PromptTemplate{
 		NumCards: data.NumCards, UserPrompt: data.UserPrompt,
 	}
@@ -326,12 +349,12 @@ func createPayload(data CreateDeckData, userId string) (*Payload, error) {
 
 	imagePrompts := []Prompt{}
 	for _, id := range data.FilesIds {
-		file, err := readFileStore(id)
+		file, mimetype, err := app.storage.GetFile(context.TODO(), id)
 		if err != nil {
 			return nil, err
 		}
 
-		content, err := readBase64(file)
+		content, err := base64EncodeFile(file, mimetype)
 		if err != nil {
 			file.Close()
 			return nil, err
@@ -418,7 +441,7 @@ func (app *App) CreateDeck(ctx *gin.Context) {
 		return
 	}
 
-	payload, err := createPayload(data, userId)
+	payload, err := app.createPayload(data, userId)
 	if err != nil {
 		handleResponse(ctx, http.StatusInternalServerError, nil)
 		return
@@ -506,79 +529,22 @@ func (app *App) GetUserInfo(ctx *gin.Context) {
 	handleResponse(ctx, http.StatusOK, response)
 }
 
-// Parse a command line flag to determine if the program
-// should be ran in debug or release mode
-func isReleaseMode() (bool, error) {
-	msg := "--releaseMode=Debug or --releaseMode=Release is required"
-
-	args := os.Args[1:]
-	if len(args) == 0 {
-		return false, errors.New(msg)
-	}
-
-	parts := strings.Split(args[0], "=")
-	if len(parts) == 1 {
-		return false, errors.New(msg)
-	}
-
-	return parts[1] == "Release", nil
-}
-
 func main() {
-	/*
-		release, err := isReleaseMode()
-		if err != nil {
-			fmt.Println(err.Error())
-			return
-		}
-
-		secretsPath := "/run/secrets" // Docker secrets path
-		if !release {
-			secretsPath = "../secrets"
-		}
-
-		app, err := NewApp(secretsPath)
-		if err != nil {
-			panic(err)
-		}
-		defer app.db.Close()
-
-		if release {
-			gin.SetMode(gin.ReleaseMode)
-			fmt.Println("Serving the backend from port 8080 in release mode")
-		} else {
-			gin.SetMode(gin.DebugMode)
-		}
-
-		server := gin.Default()
-		server.MaxMultipartMemory = 10 << 20 // 10 MB upload max
-
-		server.POST("/createUser", app.CreateUser)
-		server.POST("/uploadFiles", app.UploadFiles)
-		server.POST("/createDeck", app.CreateDeck)
-		server.GET("/userInfo", app.GetUserInfo)
-
-		if err := server.Run(); err != nil {
-			panic(err)
-		}
-	*/
 	app, err := NewApp("../.env")
 	if err != nil {
 		panic(err)
 	}
+	defer app.db.Close()
 
-	file, err := os.Open("../gopher.png")
-	if err != nil {
-		panic(err)
-	}
+	gin.SetMode(gin.DebugMode)
+	server := gin.Default()
+	server.MaxMultipartMemory = 10 << 20 // 10 MB upload max
 
-	err = app.storage.UploadFile(context.TODO(), file, "gopher.png")
-	if err != nil {
-		panic(err)
-	}
-
-	err = app.storage.GetFile(context.TODO(), "gopher.png")
-	if err != nil {
+	server.POST("/createUser", app.CreateUser)
+	server.POST("/uploadFiles", app.UploadFiles)
+	server.POST("/createDeck", app.CreateDeck)
+	server.GET("/userInfo", app.GetUserInfo)
+	if err := server.Run(); err != nil {
 		panic(err)
 	}
 }

@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -24,6 +23,7 @@ type resolver struct {
 	bucketName string
 }
 
+// Make the resulting url use our custom backblaze url host
 func (r *resolver) ResolveEndpoint(
 	ctx context.Context, params s3.EndpointParameters,
 ) (smithyendpoints.Endpoint, error) {
@@ -32,20 +32,22 @@ func (r *resolver) ResolveEndpoint(
 		return smithyendpoints.Endpoint{}, err
 	}
 
-	// Set our custom Backblaze URL
 	endpoint.URI.Host = fmt.Sprintf("s3.%s.backblazeb2.com", r.region)
 	endpoint.URI.Path = fmt.Sprintf("/%s", r.bucketName)
 
 	return endpoint, nil
 }
 
-// Create a new S3 client
-func NewCloudStorage(secrets map[string]string, bucketName, region string) (CloudStorage, error) {
+func NewCloudStorage(
+	secrets map[string]string, bucketName, region string,
+) (CloudStorage, error) {
 	key := secrets["APP_SECRET_KEY"]
 	keyId := secrets["APP_SECRET_KEY_ID"]
 
+	// Create a new s3 client
 	p := credentials.NewStaticCredentialsProvider(keyId, key, "")
-	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithCredentialsProvider(p))
+	cfg, err := config.LoadDefaultConfig(context.
+		TODO(), config.WithCredentialsProvider(p))
 	if err != nil {
 		return CloudStorage{}, err
 	}
@@ -60,7 +62,20 @@ func NewCloudStorage(secrets map[string]string, bucketName, region string) (Clou
 	return storage, nil
 }
 
-func (s *CloudStorage) UploadFile(ctx context.Context, file io.Reader, filename string) error {
+// Get the file's data and mimetype
+func (s *CloudStorage) GetFile(
+	ctx context.Context, filename string,
+) (io.ReadCloser, string, error) {
+	result, err := s.client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(s.bucketName),
+		Key:    aws.String(filename),
+	})
+	return result.Body, *result.ContentType, err
+}
+
+func (s *CloudStorage) UploadFile(
+	ctx context.Context, file io.Reader, filename string,
+) error {
 	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(s.bucketName),
 		Key:    aws.String(filename),
@@ -69,30 +84,10 @@ func (s *CloudStorage) UploadFile(ctx context.Context, file io.Reader, filename 
 	return err
 }
 
-// TODO: delete objects
-// TODO: set up a backend endpoint that acts as a proxy. that way, we
-// can fetch files from the cloud without exposing raw urls
-func (s *CloudStorage) GetFile(ctx context.Context, filename string) error {
-	result, err := s.client.GetObject(ctx, &s3.GetObjectInput{
+func (s *CloudStorage) RemoveFile(ctx context.Context, filename string) error {
+	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{
 		Bucket: aws.String(s.bucketName),
 		Key:    aws.String(filename),
 	})
-	if err != nil {
-		return err
-	}
-	defer result.Body.Close()
-
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	body, err := io.ReadAll(result.Body)
-	if err != nil {
-		return err
-	}
-
-	_, err = file.Write(body)
 	return err
 }
