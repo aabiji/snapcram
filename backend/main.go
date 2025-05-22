@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -16,16 +17,38 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+func loadSecrets(envFile string) (map[string]string, error) {
+	file, err := os.ReadFile(envFile)
+	if err != nil {
+		return nil, err
+	}
+
+	values := map[string]string{}
+
+	lines := strings.Split(string(file), "\n")
+	for index, line := range lines {
+		line := strings.Replace(line, " ", "", -1)
+
+		parts := strings.Split(line, "=")
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("error in %s on line %d", envFile, index+1)
+		}
+		values[parts[0]] = parts[1]
+	}
+
+	return values, nil
+}
+
+// TODO: write a helper function to load .env file
 // TODO: refactor this into multiple files
-// TODO: use .env file instead of secrets! (both in docker and in dev)
 
 type App struct {
 	db               *sql.DB
-	jwtSecret        []byte
-	groqApiKey       string
+	storage          CloudStorage
 	fileUploadLimit  int64
 	fileSizeLimit    int64
 	allowedMimetypes []string
+	secrets          map[string]string
 }
 
 func setupDB(path string) (*sql.DB, error) {
@@ -55,7 +78,7 @@ func setupDB(path string) (*sql.DB, error) {
 	return db, nil
 }
 
-func NewApp(baseSecretsPath string) (App, error) {
+func NewApp(envFile string) (App, error) {
 	db, err := setupDB(filepath.Join("..", "data", "database.db"))
 	if err != nil {
 		return App{}, err
@@ -68,20 +91,16 @@ func NewApp(baseSecretsPath string) (App, error) {
 		allowedMimetypes: []string{"image/png", "image/jpeg"},
 	}
 
-	// Load the secrets
-	path := filepath.Join(baseSecretsPath, "jwt_secret")
-	data, err := os.ReadFile(path)
+	secrets, err := loadSecrets(envFile)
 	if err != nil {
 		return App{}, err
 	}
-	app.jwtSecret = data
+	app.secrets = secrets
 
-	path = filepath.Join(baseSecretsPath, "groq_api_key")
-	data, err = os.ReadFile(path)
+	app.storage, err = NewCloudStorage(secrets, "snapcram", "us-east-005")
 	if err != nil {
 		return App{}, err
 	}
-	app.groqApiKey = string(data)
 
 	return app, nil
 }
@@ -129,7 +148,7 @@ func (app *App) getUserID(ctx *gin.Context) (string, error) {
 		tokenStr = tokenStr[1 : len(tokenStr)-1]
 	}
 
-	token, err := parseToken(tokenStr, app.jwtSecret)
+	token, err := parseToken(tokenStr, []byte(app.secrets["JWT_SECRET"]))
 	if err != nil {
 		return "", fmt.Errorf("invalid json web token")
 	}
@@ -167,7 +186,7 @@ func (app *App) CreateUser(ctx *gin.Context) {
 		return
 	}
 
-	tokenStr, err := createToken(app.jwtSecret, userId)
+	tokenStr, err := createToken([]byte(app.secrets["JWT_SECRET"]), userId)
 	if err != nil {
 		handleResponse(ctx, http.StatusInternalServerError, nil)
 		return
@@ -405,7 +424,7 @@ func (app *App) CreateDeck(ctx *gin.Context) {
 		return
 	}
 
-	cards, err := promptGroqLLM(*payload, app.groqApiKey, extractCards)
+	cards, err := promptGroqLLM(*payload, app.secrets["GROQ_API_KEY"], extractCards)
 	if err != nil {
 		handleResponse(ctx, http.StatusInternalServerError, nil)
 		return
@@ -506,39 +525,60 @@ func isReleaseMode() (bool, error) {
 }
 
 func main() {
-	release, err := isReleaseMode()
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
+	/*
+		release, err := isReleaseMode()
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
 
-	secretsPath := "/run/secrets" // Docker secrets path
-	if !release {
-		secretsPath = "../secrets"
-	}
+		secretsPath := "/run/secrets" // Docker secrets path
+		if !release {
+			secretsPath = "../secrets"
+		}
 
-	app, err := NewApp(secretsPath)
+		app, err := NewApp(secretsPath)
+		if err != nil {
+			panic(err)
+		}
+		defer app.db.Close()
+
+		if release {
+			gin.SetMode(gin.ReleaseMode)
+			fmt.Println("Serving the backend from port 8080 in release mode")
+		} else {
+			gin.SetMode(gin.DebugMode)
+		}
+
+		server := gin.Default()
+		server.MaxMultipartMemory = 10 << 20 // 10 MB upload max
+
+		server.POST("/createUser", app.CreateUser)
+		server.POST("/uploadFiles", app.UploadFiles)
+		server.POST("/createDeck", app.CreateDeck)
+		server.GET("/userInfo", app.GetUserInfo)
+
+		if err := server.Run(); err != nil {
+			panic(err)
+		}
+	*/
+	app, err := NewApp("../.env")
 	if err != nil {
 		panic(err)
 	}
-	defer app.db.Close()
 
-	if release {
-		gin.SetMode(gin.ReleaseMode)
-		fmt.Println("Serving the backend from port 8080 in release mode")
-	} else {
-		gin.SetMode(gin.DebugMode)
+	file, err := os.Open("../gopher.png")
+	if err != nil {
+		panic(err)
 	}
 
-	server := gin.Default()
-	server.MaxMultipartMemory = 10 << 20 // 10 MB upload max
+	err = app.storage.UploadFile(context.TODO(), file, "gopher.png")
+	if err != nil {
+		panic(err)
+	}
 
-	server.POST("/createUser", app.CreateUser)
-	server.POST("/uploadFiles", app.UploadFiles)
-	server.POST("/createDeck", app.CreateDeck)
-	server.GET("/userInfo", app.GetUserInfo)
-
-	if err := server.Run(); err != nil {
+	err = app.storage.GetFile(context.TODO(), "gopher.png")
+	if err != nil {
 		panic(err)
 	}
 }
