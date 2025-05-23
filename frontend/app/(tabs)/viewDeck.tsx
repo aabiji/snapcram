@@ -6,9 +6,9 @@ import { StyleSheet } from "react-native";
 import { Button, Card, H3, Text, View, XStack, YStack } from "tamagui";
 import { Check, X, Redo } from "@tamagui/lucide-icons";
 
-import { storageGet, storageSet, Deck } from "./helpers";
+import { storageGet, storageSet, Deck } from "../lib/helpers";
 
-export default function DeckViewer() {
+export default function ViewDeck() {
   const navigation = useNavigation();
   const routeParams = useLocalSearchParams();
   const index = Number(routeParams.index);

@@ -1,32 +1,34 @@
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { Pressable, StyleSheet } from "react-native";
 
-import { Button, Card, H3, View, YGroup } from "tamagui";
-import { ChevronRight, Plus } from "@tamagui/lucide-icons";
+import { Card, H3, H5, Text, ScrollView, YStack } from "tamagui";
+import { ChevronRight } from "@tamagui/lucide-icons";
 
 import { router, useNavigation } from "expo-router";
 
-import CreateDeck from "./createDeck";
-
-import { storageGet, storageSet, request, Deck } from "./helpers";
+import { storageGet, storageSet, request, Deck } from "../lib/helpers";
 
 function DeckCard({ deck, index }: { deck: Deck, index: number }) {
   return (
-    <Card>
-      <H3> {deck.name} </H3>
-      <Button
-        iconAfter={ChevronRight}
-        onPress={() =>
-          router.push({pathname: "/deckViewer", params: {index}})
-        }
-      />
-    </Card>
+    <Pressable
+      onPress={() =>
+        router.push({pathname: "/viewDeck", params: {index}})
+      }
+      >
+      <Card elevate style={styles.card}>
+        <YStack>
+          <H5 fontWeight="bold"> {deck.name} </H5>
+          <Text>Deck description</Text>
+        </YStack>
+        <ChevronRight />
+      </Card>
+    </Pressable>
   );
 }
 
 export default function Index() {
   const navigation = useNavigation();
 
-  const [showModal, setShowModal] = useState(false);
   const [decks, setDecks] = useState<Deck[]>([]);
 
   const fetchUserInfo = async () => {
@@ -75,31 +77,30 @@ export default function Index() {
 
   useEffect(() => { authenticate(); }, []);
 
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      title: "Your decks",
-      headerRight: () => (
-        <Button
-          transparent
-          onPress={() => setShowModal(true)}
-          icon={<Plus color="blue" scale={1.5} />} />
-      )
-    });
-  }, [navigation]);
-
   return (
-    <View flex={1}>
-      {showModal &&
-        <CreateDeck setDecks={setDecks} setClose={() => setShowModal(false)} />
-      }
-
-      <YGroup alignSelf="center" bordered gap={10}>
+    <ScrollView flex={1} style={styles.container}>
+      <H3>Your decks</H3>
+      <YStack gap={25} paddingTop={20}>
         {decks.map((item, index) => (
-          <YGroup.Item key={index}>
-            <DeckCard deck={item} index={index} />
-          </YGroup.Item>
+          <DeckCard deck={item} index={index} />
         ))}
-      </YGroup>
-    </View>
+      </YStack>
+    </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  card: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 15,
+  },
+  container: {
+    paddingTop: 50,
+    paddingRight: 20,
+    paddingLeft: 20,
+    paddingBottom: 20,
+  },
+});

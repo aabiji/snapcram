@@ -2,30 +2,29 @@ import { router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 
 import { useState } from "react";
-import { FlatList, Modal, StyleSheet, TouchableOpacity } from "react-native";
+import { FlatList, StyleSheet } from "react-native";
 
 import {
-  Button, Image, Input, H3, Text, Spinner,
-  TextArea, useWindowDimensions, XStack, YStack,
+  Button, Image, Input, H3, Text, Spinner, TextArea, XStack, YStack,
+  useTheme,
 } from "tamagui";
 import { Plus, Redo } from "@tamagui/lucide-icons";
 
-import { Deck, ImageInfo, request, storageGet, storageSet } from "./helpers";
+import { Deck, ImageInfo, request, storageGet, storageSet } from "../lib/helpers";
 
 enum States { UploadingImages, GeneratingCards, Error };
 
-function ModalContent(
-  { setClose, setDecks }: { setClose: () => void, setDecks: React.SetStateAction<Deck[]> }
-) {
+export default function CreateDeck({ setDecks }: { setDecks: React.SetStateAction<Deck[]>}) {
   const [name, setName] = useState("");
   const [userPrompt, setUserPrompt] = useState("");
   const [numCards, setNumCards] = useState(0);
   const [images, setImages] = useState<ImageInfo[]>([]);
   const [state, setState] = useState(-1);
 
-  const [nameBorder, setNameBorder] = useState("grey");
-  const [numCardsBorder, setNumCardsBorder] = useState("grey");
-  const [imagesBorder, setImagesBorder] = useState("grey");
+  const defaultBorderColor = useTheme().borderColor.val;
+  const [nameBorder, setNameBorder] = useState(defaultBorderColor);
+  const [numCardsBorder, setNumCardsBorder] = useState(defaultBorderColor);
+  const [imagesBorder, setImagesBorder] = useState(defaultBorderColor);
 
   const updateNumCards = (text: string) => {
     const num = Math.round(Number(text));
@@ -90,8 +89,7 @@ function ModalContent(
         const index = list.length;
         storageSet("decks", [...list, json]);
         setDecks([...list, json]);
-        setClose();
-        router.push({pathname: "/deckViewer", params: {index}})
+        router.push({pathname: "/viewDeck", params: {index}})
       } else {
         setState(States.Error);
       }
@@ -100,21 +98,22 @@ function ModalContent(
     }
   }
 
+
   const startCreationProcess = () => {
     const nameEmpty = name.trim().length == 0;
     const cardsEmpty = numCards == 0;
     const imagesEmpty = images.length == 0;
 
-    setNameBorder(nameEmpty ? "red" : "grey");
-    setNumCardsBorder(cardsEmpty ? "red" : "grey");
-    setImagesBorder(imagesEmpty ? "red" : "grey");
+    setNameBorder(nameEmpty ? "red" : defaultBorderColor);
+    setNumCardsBorder(cardsEmpty ? "red" : defaultBorderColor);
+    setImagesBorder(imagesEmpty ? "red" : defaultBorderColor);
 
     if (!nameEmpty && !cardsEmpty && !imagesEmpty)
       uploadImages();
   }
 
   return (
-    <YStack padding={15}>
+    <YStack style={styles.container}>
       {state == -1 &&
         <>
           <YStack gap={15} height="92%">
@@ -201,33 +200,13 @@ function ModalContent(
   );
 }
 
-export default function CreateDeck(
-  { setClose, setDecks }: { setClose: () => void, setDecks: React.SetStateAction<Deck[]> }
-) {
-  const height = useWindowDimensions().height * 0.9;
-  return (
-    <Modal
-      transparent
-      statusBarTranslucent
-      onRequestClose={setClose}
-      >
-      <TouchableOpacity
-        activeOpacity={1}
-        style={styles.modalContainer}
-        onPress={setClose}
-      >
-        <TouchableOpacity
-          activeOpacity={1}
-          style={{ ...styles.modal, height }}
-        >
-          <ModalContent setClose={setClose} setDecks={setDecks} />
-        </TouchableOpacity>
-      </TouchableOpacity>
-    </Modal>
-  );
-}
-
 const styles = StyleSheet.create({
+  container: {
+    paddingTop: 50,
+    paddingRight: 20,
+    paddingLeft: 20,
+    paddingBottom: 20,
+  },
   imageContainer: {
     flex: 1,
     borderWidth: 1,
@@ -250,15 +229,4 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginTop: 5
   },
-  modal: {
-    margin: "auto",
-    width: "88%",
-    borderRadius: 10,
-    backgroundColor: "white",
-    top: 0
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)"
-  }
 });

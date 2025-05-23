@@ -1,0 +1,19 @@
+- In production (docker), use postgresql (port the sql over)
+- film devlog
+- polish the flashcards page
+  - flip the card when we click it
+- polish the flashcard decks page
+- style the loading screens
+- improve the styling
+- refresh the page content when we navigate to the createDeck page
+- allow the model to add diagrams and images into the flashcards
+- figure out how to upload unlimited images when prompting
+    - https://x.com/i/grok?conversation=1924684231906652389
+- add settings component -- new page
+- add authentication page
+- algorithm to show flashcards that you're less confident about
+  more often that those that you are confident about
+- export the flashcards to anki
+- also support pdf and word files, along with images
+- revamp this readme
+- make the docker container usable
