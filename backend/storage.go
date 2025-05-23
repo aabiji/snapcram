@@ -14,8 +14,10 @@ import (
 )
 
 type CloudStorage struct {
-	client     *s3.Client
-	bucketName string
+	client           *s3.Client
+	bucketName       string
+	allowedMimetypes []string
+	fileSizeLimit    int64
 }
 
 type resolver struct {
