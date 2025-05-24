@@ -17,7 +17,7 @@ npx expo start
 Run the backend
 ```bash
 cd path/to/snapcram/backend
-docker compose up
+sudo docker compose up --build
 ```
 
 When running the backend, you'll also need to create a .env in the project root that looks something like this:
@@ -36,4 +36,5 @@ JWT_SECRET=<generate a secret key using this: https://jwtsecret.com/generate>
 PGUSER=postgres
 POSTGRES_DB=<what you want to call the database>
 POSTGRES_PASSWORD=<super secret database password!>
+DATABASE_URL=postgresql://<PGUSER>:<POSTGRES_PASSWORD>@db:5432/<POSTGRES_DB>
 ```

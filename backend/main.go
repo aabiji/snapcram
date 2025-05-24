@@ -9,7 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -23,20 +23,19 @@ type App struct {
 }
 
 func NewApp() (App, error) {
-	path := filepath.Join("..", "data", "database.db")
-	db, err := NewDatabase(path)
-	if err != nil {
-		return App{}, err
-	}
-
 	secrets := readEnvironmentVariables()
 
 	debugVar := os.Getenv("DEBUG_MODE")
-	mode, err := strconv.Atoi(debugVar)
-	if err != nil {
+	mode := strings.Trim(debugVar, " ")
+	if len(mode) == 0 {
 		panic("DEBUG_MODE environment variable not set")
 	}
-	inDebugMode := mode == 1
+	inDebugMode := mode == "1"
+
+	db, err := NewDatabase(secrets["DATABASE_URL"])
+	if err != nil {
+		return App{}, err
+	}
 
 	storage, err := NewCloudStorage(secrets)
 	if err != nil {
@@ -72,10 +71,13 @@ func handleResponse(ctx *gin.Context, statusCode int, object any) {
 // ensure the user exists, then return it
 func (app *App) getUserID(ctx *gin.Context) (string, error) {
 	tokenStr := ctx.GetHeader("Authorization")
+	if len(strings.Trim(tokenStr, " ")) == 0 {
+		return "", fmt.Errorf("no jwt found")
+	}
+
 	if tokenStr[0] == '"' { // Remove quotes if present
 		tokenStr = tokenStr[1 : len(tokenStr)-1]
 	}
-
 	token, err := parseToken(tokenStr, []byte(app.secrets["JWT_SECRET"]))
 	if err != nil {
 		return "", fmt.Errorf("invalid json web token")

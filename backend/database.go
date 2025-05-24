@@ -1,8 +1,10 @@
 package main
 
-import "database/sql"
+import (
+	"context"
 
-// TODO: port database driver to pgx
+	"github.com/jackc/pgx/v5/pgxpool"
+)
 
 type Card struct {
 	Front string `json:"front"`
@@ -14,12 +16,10 @@ type Deck struct {
 	Cards []Card `json:"cards"`
 }
 
-type Database struct {
-	ptr *sql.DB
-}
+type Database struct{ pool *pgxpool.Pool }
 
-func NewDatabase(path string) (Database, error) {
-	db, err := sql.Open("sqlite3", path)
+func NewDatabase(url string) (Database, error) {
+	pool, err := pgxpool.New(context.Background(), url)
 	if err != nil {
 		return Database{}, err
 	}
@@ -28,53 +28,43 @@ func NewDatabase(path string) (Database, error) {
 	statement := `
 		create table if not exists Users (ID text not null);
 		create table if not exists Decks (
-			ID integer not null primary key,
+			ID serial not null primary key,
 			UserID text not null,
 			Name text not null
 		);
 		create table if not exists Flashcards (
-			ID integer not null primary key,
+			ID serial not null primary key,
 			DeckID integer not null,
 			Front text not null,
 			Back text not null
 		);`
-	_, err = db.Exec(statement)
+	_, err = pool.Exec(context.Background(), statement)
 	if err != nil {
 		return Database{}, err
 	}
 
-	return Database{db}, nil
+	return Database{pool}, nil
 }
 
-func (db *Database) Close() { db.ptr.Close() }
+func (db *Database) Close() { db.pool.Close() }
 
 func (db *Database) rowExists(query string, values ...any) (bool, error) {
-	statement, err := db.ptr.Prepare(query)
-	if err != nil {
-		return false, err
-	}
-
-	rows, err := statement.Query(values...)
+	rows, err := db.pool.Query(context.Background(), query, values...)
 	if err != nil {
 		return false, err
 	}
 	defer rows.Close()
-
 	return rows.Next(), nil
 }
 
 func (db *Database) insertUser(userId string) error {
-	statement, err := db.ptr.Prepare("insert into Users (ID) values (?)")
-	if err != nil {
-		return err
-	}
-
-	_, err = statement.Exec(userId)
+	statement := "insert into Users (ID) values ($1)"
+	_, err := db.pool.Exec(context.Background(), statement, userId)
 	return err
 }
 
 func (db *Database) userExists(userId string) (bool, error) {
-	exists, err := db.rowExists("select * from Users where ID = ?", userId)
+	exists, err := db.rowExists("select * from Users where ID = $1", userId)
 	if err != nil {
 		return false, err
 	}
@@ -82,50 +72,34 @@ func (db *Database) userExists(userId string) (bool, error) {
 }
 
 func (db *Database) insertDeck(userId string, deck Deck) error {
-	_, err := db.ptr.Exec("begin transaction;")
+	tx, err := db.pool.Begin(context.Background())
 	if err != nil {
 		return err
 	}
+	defer tx.Rollback(context.Background())
 
-	statement, err := db.ptr.Prepare("insert into Decks (UserId, Name) values (?, ?);")
-	if err != nil {
-		return err
-	}
-
-	result, err := statement.Exec(userId, deck.Name)
-	if err != nil {
-		return err
-	}
-
-	deckId, err := result.LastInsertId()
+	var deckId int
+	str := "insert into Decks (UserId, Name) values ($1, $2) returning ID;"
+	err = tx.QueryRow(context.Background(), str, userId, deck.Name).Scan(&deckId)
 	if err != nil {
 		return err
 	}
 
 	for _, card := range deck.Cards {
-		str := "insert into Flashcards (DeckId, Front, Back) values (?, ?, ?);"
-		statement, err = db.ptr.Prepare(str)
-		if err != nil {
-			return err
-		}
-
-		_, err = statement.Exec(deckId, card.Front, card.Back)
+		str := "insert into Flashcards (DeckId, Front, Back) values ($1, $2, $3);"
+		_, err = tx.Exec(context.Background(), str, deckId, card.Front, card.Back)
 		if err != nil {
 			return err
 		}
 	}
 
-	_, err = db.ptr.Exec("commit;")
+	err = tx.Commit(context.Background())
 	return err
 }
 
 func (db *Database) getFlashcards(deckId string) ([]Card, error) {
-	query, err := db.ptr.Prepare("select Front, Back from Flashcards where DeckID = ?")
-	if err != nil {
-		return nil, err
-	}
-
-	rows, err := query.Query(deckId)
+	str := "select Front, Back from Flashcards where DeckID = $1"
+	rows, err := db.pool.Query(context.Background(), str, deckId)
 	if err != nil {
 		return nil, err
 	}
@@ -144,12 +118,8 @@ func (db *Database) getFlashcards(deckId string) ([]Card, error) {
 }
 
 func (db *Database) getDecks(userId string) ([]Deck, error) {
-	query, err := db.ptr.Prepare("select ID, Name from Decks where UserID = ?")
-	if err != nil {
-		return nil, err
-	}
-
-	rows, err := query.Query(userId)
+	str := "select ID, Name from Decks where UserID = $1"
+	rows, err := db.pool.Query(context.Background(), str, userId)
 	if err != nil {
 		return nil, err
 	}
