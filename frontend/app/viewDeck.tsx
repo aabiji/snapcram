@@ -70,8 +70,7 @@ export default function ViewDeck() {
       {!done &&
         <View height="100%">
           <Card
-            elevate bordered
-            style={styles.flaschard}
+            bordered style={styles.flaschard}
             onPress={() => setShowFront(!showFront)}
           >
             <H3 textAlign="center" fontWeight="bold">
@@ -104,12 +103,11 @@ export default function ViewDeck() {
 
 const styles = StyleSheet.create({
   flaschard: {
-    width: "85%",
-    height: "75%",
+    width: "95%",
+    height: "65%",
     alignSelf: "center",
     backgroundColor: "white",
     justifyContent: "center",
-    flex: 1,
   },
   controls: {
     width: "80%",

@@ -1,12 +1,11 @@
 import { router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 
-import { useState } from "react";
-import { FlatList, StyleSheet } from "react-native";
+import { useEffect, useState } from "react";
+import { StyleSheet } from "react-native";
 
 import {
   Button, Image, Input, H3, Text, Spinner, TextArea, XStack, YStack,
-  useTheme,
 } from "tamagui";
 import { Plus, Redo } from "@tamagui/lucide-icons";
 
@@ -20,12 +19,8 @@ export default function CreateDeck({ setDecks }: { setDecks: React.SetStateActio
   const [userPrompt, setUserPrompt] = useState("");
   const [numCards, setNumCards] = useState(0);
   const [images, setImages] = useState<ImageInfo[]>([]);
+  const [buttonDisabled, setButtonDisabled] = useState(false);
   const [state, setState] = useState(-1);
-
-  const defaultBorderColor = useTheme().borderColor.val;
-  const [nameBorder, setNameBorder] = useState(defaultBorderColor);
-  const [numCardsBorder, setNumCardsBorder] = useState(defaultBorderColor);
-  const [imagesBorder, setImagesBorder] = useState(defaultBorderColor);
 
   const updateNumCards = (text: string) => {
     const num = Math.round(Number(text));
@@ -99,79 +94,62 @@ export default function CreateDeck({ setDecks }: { setDecks: React.SetStateActio
     }
   }
 
-
-  const startCreationProcess = () => {
-    const nameEmpty = name.trim().length == 0;
-    const cardsEmpty = numCards == 0;
-    const imagesEmpty = images.length == 0;
-
-    setNameBorder(nameEmpty ? "red" : defaultBorderColor);
-    setNumCardsBorder(cardsEmpty ? "red" : defaultBorderColor);
-    setImagesBorder(imagesEmpty ? "red" : defaultBorderColor);
-
-    if (!nameEmpty && !cardsEmpty && !imagesEmpty)
-      uploadImages();
-  }
+  useEffect(() => {
+    if (name.trim().length == 0 || numCards == 0 || images.length == 0)
+      setButtonDisabled(true);
+    else
+      setButtonDisabled(false);
+  }, [name, numCards, images]);
 
   return (
     <Page header={<Header title="Create deck" />}>
       {state == -1 &&
-        <>
-          <YStack gap={15} height="92%">
-            <YStack height="40%" gap={15}>
-              <Input
-                onChangeText={setName}
-                height="25%" placeholder="Deck name"
-                borderColor={nameBorder}
-              />
+        <YStack gap={15} height="100%">
 
-              <XStack alignItems="center" height="10%">
+          <YStack maxHeight="40%">
+            <YStack gap={15}>
+              <Input onChangeText={setName} placeholder="Deck name" />
+              <XStack alignItems="center">
                 <Text width="80%" htmlFor="numCards" height="100%">Number of cards</Text>
                 <Input
                   width="20%" id="numCards"
                   value={`${numCards == 0 ? "" : numCards}`}
                   placeholder="0" keyboardType="numeric"
                   onChangeText={updateNumCards}
-                  borderColor={numCardsBorder}
                 />
               </XStack>
-
               <TextArea
-                height="55%"
                 onChangeText={setUserPrompt}
                 placeholder="Additional instructions (optional)"
               />
             </YStack>
+          </YStack>
 
+          <YStack height="60%">
             <YStack flex={3}>
               <XStack justifyContent="space-between" alignItems="center">
                 <Text> Choose images </Text>
                 <Button transparent icon={<Plus scale={1.5} />} onPress={pickImage} />
               </XStack>
 
-              <FlatList
-                data={images}
-                style={styles.grid}
-                contentContainerStyle={{
-                  ...styles.imageContainer,
-                  borderColor: imagesBorder
-                }}
-                numColumns={3}
-                renderItem={({ item }) => (
-                  <Image style={styles.gridItem} source={{ uri: item.uri }} />
-                )}
-              />
+              <YStack style={styles.grid}>
+                {images.map((item, index) => {
+                  <Image style={styles.gridItem} key={index} source={{ uri: item.uri }} />
+                })}
+              </YStack>
             </YStack>
+
+            <Button
+              themeInverse
+              disabled={buttonDisabled}
+              onPress={uploadImages}
+              style={styles.button}
+            >
+              Create deck
+            </Button>
           </YStack>
 
-          <Button
-            themeInverse
-            onPress={startCreationProcess}
-            style={styles.button}
-          >
-            Create deck
-          </Button>
-        </>
+        </YStack>
       }
 
       {state == States.Error &&
@@ -202,16 +180,15 @@ export default function CreateDeck({ setDecks }: { setDecks: React.SetStateActio
 }
 
 const styles = StyleSheet.create({
-  imageContainer: {
+  grid: {
+    width: "100%",
+    margin: "auto",
+    padding: 0,
     flex: 1,
     borderWidth: 1,
     borderStyle: "dashed",
     borderRadius: 15,
-  },
-  grid: {
-    width: "100%",
-    margin: "auto",
-    padding: 0
+    overflow: "scroll"
   },
   gridItem: {
     width: "30%",
@@ -221,7 +198,6 @@ const styles = StyleSheet.create({
   },
   button: {
     height: "8%",
-    fontWeight: "bold",
-    marginTop: 5
+    fontWeight: "bold"
   },
 });

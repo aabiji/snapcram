@@ -1,27 +1,42 @@
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet } from "react-native";
 
-import { Button, Card, H3, H5, Text, XStack, YStack } from "tamagui";
-import { ChevronRight, Plus, Settings } from "@tamagui/lucide-icons";
+import { Button, Card, Text, XStack, YStack } from "tamagui";
+import { ChevronRight, ChevronDown, Pen, Repeat, Trash } from "@tamagui/lucide-icons";
 
 import { router } from "expo-router";
 
 import { storageGet, storageSet, request, Deck } from "./lib/helpers";
-import Page from "./components/page";
+import { Page, MainHeader } from "./components/page";
 
 function DeckCard({ deck, index }: { deck: Deck, index: number }) {
+  const [showControls, setShowControls] = useState(false);
+
   return (
-    <Pressable
-      onPress={() =>
-        router.push({pathname: "/viewDeck", params: {index}})
-      }
-      >
-      <Card elevate style={styles.card}>
-        <YStack>
-          <H5 fontWeight="bold"> {deck.name} </H5>
-          <Text>Deck description</Text>
-        </YStack>
-        <ChevronRight />
+    <Pressable>
+      <Card style={styles.card} bordered>
+        <XStack justifyContent="space-between" width="100%">
+          <YStack>
+            <Text fontWeight="bold">{deck.name}</Text>
+            <Text>80% confident</Text>
+          </YStack>
+          {showControls && <ChevronDown scale={1.25} onPress={() => setShowControls(false)} />}
+          {!showControls && <ChevronRight scale={1.25} onPress={() => setShowControls(true)} />}
+        </XStack>
+
+        {showControls &&
+          <XStack justifyContent="space-between" width="100%">
+            <Button padding={0} transparent color="red" icon={<Trash />}>Delete</Button>
+            <Button padding={0} transparent color="green" icon={<Pen />}>Edit</Button>
+            <Button
+              color="purple" icon={<Repeat />} transparent padding={0}
+              onPress={() =>
+                router.push({ pathname: "/viewDeck", params: { index } })
+            }>
+              Practice
+            </Button>
+          </XStack>
+        }
       </Card>
     </Pressable>
   );
@@ -76,26 +91,8 @@ export default function Index() {
 
   useEffect(() => { authenticate(); }, []);
 
-  const HeaderBar = () => {
-    return (
-      <XStack justifyContent="space-between">
-        <H3>Time to study!</H3>
-        <XStack>
-          <Button
-            onPress={() => router.navigate("/createDeck")}
-            transparent icon={<Plus scale={1.5} />}
-          />
-          <Button
-            onPress={() => router.navigate("/settings")}
-            transparent icon={<Settings scale={1.5} />}
-          />
-        </XStack>
-      </XStack>
-    );
-  };
-
   return (
-    <Page header={<HeaderBar />}>
+    <Page header={<MainHeader />}>
       <YStack gap={25} paddingTop={20}>
         {decks.map((item, index) => (
           <DeckCard deck={item} index={index}  key={index} />
@@ -108,9 +105,6 @@ export default function Index() {
 const styles = StyleSheet.create({
   card: {
     width: "100%",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     padding: 15,
   },
 });
