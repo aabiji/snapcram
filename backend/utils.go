@@ -32,24 +32,11 @@ func createRandomFilename(userId, extension string) string {
 	return fmt.Sprintf("%s-%d-%d%s", userId, timestamp, value, extension)
 }
 
-func loadSecrets(envFile string) (map[string]string, error) {
-	file, err := os.ReadFile(envFile)
-	if err != nil {
-		return nil, err
-	}
-
+func readEnvironmentVariables() map[string]string {
 	values := map[string]string{}
-
-	lines := strings.Split(string(file), "\n")
-	for index, line := range lines {
-		line := strings.Replace(line, " ", "", -1)
-
-		parts := strings.Split(line, "=")
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("error in %s on line %d", envFile, index+1)
-		}
-		values[parts[0]] = parts[1]
+	for _, value := range os.Environ() {
+		pair := strings.SplitN(value, "=", 2)
+		values[pair[0]] = pair[1]
 	}
-
-	return values, nil
+	return values
 }

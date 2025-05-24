@@ -17,8 +17,23 @@ npx expo start
 Run the backend
 ```bash
 cd path/to/snapcram/backend
-docker compose up --build --watch # enable hot reloading
-# `docker compose down` to delete the container
+docker compose up
+```
 
-# TODO: get a groq api key
+When running the backend, you'll also need to create a .env in the project root that looks something like this:
+```env
+DEBUG_MODE=1
+
+GROQ_API_KEY=<your api key>
+
+APP_SECRET_KEY_ID=<your backblaze secret key>
+APP_SECRET_KEY=<your backblaze secret key id>
+BUCKET_REGION=<your backblaze bucket region>
+BUCKET_NAME=<your backblaze bucket name>
+
+JWT_SECRET=<generate a secret key using this: https://jwtsecret.com/generate>
+
+PGUSER=postgres
+POSTGRES_DB=<what you want to call the database>
+POSTGRES_PASSWORD=<super secret database password!>
 ```

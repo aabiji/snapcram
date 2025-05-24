@@ -1,5 +1,5 @@
 - Overhaul the UI and add animations
-  Colors (inspired by Claude): bg = #F5F4ED, font = Copernicus
+  Colors (inspired by Claude): https://coolors.co/fdf6e3-3454d1-070707-d1345b-fb8b24
 - Add a authentication and settings page
 - Allow the user to edit their flashcards
 - Figure out how to create flashcard decks from unlimited assets
@@ -22,4 +22,9 @@
 - Host the backend (and website) and publish to the play store
 - Find and load existing flashcard decks (not necessarily ai generated)
 - Extend the idea further and generate mock tests
+- Design logo and art
 - Film devlogs, etc
+
+- https://www.namecheap.com/domains/domain-name-search/
+- https://cloud.google.com/free/docs/free-cloud-features#free-tier
+- https://support.google.com/googleplay/android-developer/answer/6112435?hl=en#zippy=%2Cstep-accept-the-developer-distribution-agreement%2Cstep-pay-registration-fee%2Cstep-choose-a-developer-account-type%2Cstep-verify-your-developer-identity-information

@@ -2,6 +2,8 @@ package main
 
 import "database/sql"
 
+// TODO: port database driver to pgx
+
 type Card struct {
 	Front string `json:"front"`
 	Back  string `json:"back"`

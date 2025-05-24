@@ -40,9 +40,7 @@ func (r *resolver) ResolveEndpoint(
 	return endpoint, nil
 }
 
-func NewCloudStorage(
-	secrets map[string]string, bucketName, region string,
-) (CloudStorage, error) {
+func NewCloudStorage(secrets map[string]string) (CloudStorage, error) {
 	key := secrets["APP_SECRET_KEY"]
 	keyId := secrets["APP_SECRET_KEY_ID"]
 
@@ -54,7 +52,9 @@ func NewCloudStorage(
 		return CloudStorage{}, err
 	}
 
-	resolver := resolver{region: region, bucketName: bucketName}
+	region := secrets["BUCKET_REGION"]
+	bucketName := secrets["BUCKET_NAME"]
+	resolver := resolver{region, bucketName}
 	client := s3.NewFromConfig(cfg, func(opts *s3.Options) {
 		opts.EndpointResolverV2 = &resolver
 		opts.Region = region

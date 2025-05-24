@@ -7,17 +7,21 @@ services:
       - "8080:8080"
     volumes:
       - ./backend:/snapcram
-    secrets:
-      - jwt_secret
-      - groq_api_key
     develop:
       watch:
         - action: restart
           target: /snapcram
           path: ./backend
-
-secrets:
-  groq_api_key:
-    file: secrets/groq_api_key
-  jwt_secret:
-    file: secrets/jwt_secret
+    env_file: ".env"
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    image: postgres
+    restart: always
+    env_file: ".env"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 1s
+      timeout: 5s
+      retries: 10

@@ -6,40 +6,46 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	_ "github.com/mattn/go-sqlite3"
 )
 
 type App struct {
-	db      Database
-	storage CloudStorage
-	secrets map[string]string
+	db          Database
+	storage     CloudStorage
+	secrets     map[string]string
+	inDebugMode bool
 }
 
-func NewApp(envFile string) (App, error) {
+func NewApp() (App, error) {
 	path := filepath.Join("..", "data", "database.db")
 	db, err := NewDatabase(path)
 	if err != nil {
 		return App{}, err
 	}
 
-	secrets, err := loadSecrets(envFile)
-	if err != nil {
-		return App{}, err
-	}
+	secrets := readEnvironmentVariables()
 
-	storage, err := NewCloudStorage(secrets, "snapcram", "us-east-005")
+	debugVar := os.Getenv("DEBUG_MODE")
+	mode, err := strconv.Atoi(debugVar)
+	if err != nil {
+		panic("DEBUG_MODE environment variable not set")
+	}
+	inDebugMode := mode == 1
+
+	storage, err := NewCloudStorage(secrets)
 	if err != nil {
 		return App{}, err
 	}
 	storage.fileSizeLimit = 32 << 20 // 32 megabytes
 	storage.allowedMimetypes = []string{"image/png", "image/jpeg"}
 
-	return App{db, storage, secrets}, nil
+	return App{db, storage, secrets, inDebugMode}, nil
 }
 
 // Write response json that either holds an error message or some custom data
@@ -328,13 +334,18 @@ func (app *App) CreateDeck(ctx *gin.Context) {
 }
 
 func main() {
-	app, err := NewApp("../.env")
+	app, err := NewApp()
 	if err != nil {
 		panic(err)
 	}
 	defer app.db.Close()
 
-	gin.SetMode(gin.DebugMode)
+	if app.inDebugMode {
+		gin.SetMode(gin.DebugMode)
+	} else {
+		gin.SetMode(gin.ReleaseMode)
+	}
+
 	server := gin.Default()
 	server.MaxMultipartMemory = 10 << 20 // 10 MB upload max
 
