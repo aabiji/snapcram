@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet } from "react-native";
 
-import { Card, H3, H5, Text, ScrollView, YStack } from "tamagui";
-import { ChevronRight } from "@tamagui/lucide-icons";
+import { Button, Card, H3, H5, Text, XStack, YStack } from "tamagui";
+import { ChevronRight, Plus, Settings } from "@tamagui/lucide-icons";
 
-import { router, useNavigation } from "expo-router";
+import { router } from "expo-router";
 
-import { storageGet, storageSet, request, Deck } from "../lib/helpers";
+import { storageGet, storageSet, request, Deck } from "./lib/helpers";
+import Page from "./components/page";
 
 function DeckCard({ deck, index }: { deck: Deck, index: number }) {
   return (
@@ -27,8 +28,6 @@ function DeckCard({ deck, index }: { deck: Deck, index: number }) {
 }
 
 export default function Index() {
-  const navigation = useNavigation();
-
   const [decks, setDecks] = useState<Deck[]>([]);
 
   const fetchUserInfo = async () => {
@@ -77,15 +76,32 @@ export default function Index() {
 
   useEffect(() => { authenticate(); }, []);
 
+  const HeaderBar = () => {
+    return (
+      <XStack justifyContent="space-between">
+        <H3>Time to study!</H3>
+        <XStack>
+          <Button
+            onPress={() => router.navigate("/createDeck")}
+            transparent icon={<Plus scale={1.5} />}
+          />
+          <Button
+            onPress={() => router.navigate("/settings")}
+            transparent icon={<Settings scale={1.5} />}
+          />
+        </XStack>
+      </XStack>
+    );
+  };
+
   return (
-    <ScrollView flex={1} style={styles.container}>
-      <H3>Your decks</H3>
+    <Page header={<HeaderBar />}>
       <YStack gap={25} paddingTop={20}>
         {decks.map((item, index) => (
-          <DeckCard deck={item} index={index} />
+          <DeckCard deck={item} index={index}  key={index} />
         ))}
       </YStack>
-    </ScrollView>
+    </Page>
   );
 }
 
@@ -96,11 +112,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     padding: 15,
-  },
-  container: {
-    paddingTop: 50,
-    paddingRight: 20,
-    paddingLeft: 20,
-    paddingBottom: 20,
   },
 });

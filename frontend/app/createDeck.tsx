@@ -10,7 +10,8 @@ import {
 } from "tamagui";
 import { Plus, Redo } from "@tamagui/lucide-icons";
 
-import { Deck, ImageInfo, request, storageGet, storageSet } from "../lib/helpers";
+import { Deck, ImageInfo, request, storageGet, storageSet } from "./lib/helpers";
+import { Page, Header } from "./components/page";
 
 enum States { UploadingImages, GeneratingCards, Error };
 
@@ -113,7 +114,7 @@ export default function CreateDeck({ setDecks }: { setDecks: React.SetStateActio
   }
 
   return (
-    <YStack style={styles.container}>
+    <Page header={<Header title="Create deck" />}>
       {state == -1 &&
         <>
           <YStack gap={15} height="92%">
@@ -196,17 +197,11 @@ export default function CreateDeck({ setDecks }: { setDecks: React.SetStateActio
           <Spinner size="large" color="$blue10Light" />
         </>
       }
-    </YStack>
+    </Page>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    paddingTop: 50,
-    paddingRight: 20,
-    paddingLeft: 20,
-    paddingBottom: 20,
-  },
   imageContainer: {
     flex: 1,
     borderWidth: 1,

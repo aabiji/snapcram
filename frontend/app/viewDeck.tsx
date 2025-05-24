@@ -6,7 +6,8 @@ import { StyleSheet } from "react-native";
 import { Button, Card, H3, Text, View, XStack, YStack } from "tamagui";
 import { Check, X, Redo } from "@tamagui/lucide-icons";
 
-import { storageGet, storageSet, Deck } from "../lib/helpers";
+import { storageGet, storageSet, Deck } from "./lib/helpers";
+import { Page, Header } from "./components/page";
 
 export default function ViewDeck() {
   const navigation = useNavigation();
@@ -56,7 +57,7 @@ export default function ViewDeck() {
   }
 
   return (
-    <YStack style={styles.container}>
+    <Page header={<Header title={deck.name} />}>
       <YStack>
         {done &&
           <Button transparent onPress={restart}>
@@ -97,7 +98,7 @@ export default function ViewDeck() {
           </XStack>
         </View>
       }
-    </YStack>
+    </Page>
   );
 }
 
@@ -118,7 +119,4 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignSelf: "center",
   },
-  container: {
-    flex: 1,
-  }
 });

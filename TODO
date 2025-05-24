@@ -1,19 +1,25 @@
-- In production (docker), use postgresql (port the sql over)
-- film devlog
-- polish the flashcards page
-  - flip the card when we click it
-- polish the flashcard decks page
-- style the loading screens
-- improve the styling
-- refresh the page content when we navigate to the createDeck page
-- allow the model to add diagrams and images into the flashcards
-- figure out how to upload unlimited images when prompting
-    - https://x.com/i/grok?conversation=1924684231906652389
-- add settings component -- new page
-- add authentication page
-- algorithm to show flashcards that you're less confident about
-  more often that those that you are confident about
-- export the flashcards to anki
-- also support pdf and word files, along with images
-- revamp this readme
-- make the docker container usable
+- Overhaul the UI and add animations
+  Colors (inspired by Claude): bg = #F5F4ED, font = Copernicus
+- Add a authentication and settings page
+- Allow the user to edit their flashcards
+- Figure out how to create flashcard decks from unlimited assets
+  What we could do is generate small sets of flashcards from each
+  batch (group of assets). When we've processed all the batches,
+  we can combine all the flashcard sets together then prompt the
+  llm *again* to cohesively tie all the flashcards together,
+  remove lower quality flashcards, create new flashcards from the
+  flashcards, etc. Then that final combined set of flashcards is
+  return to the user.
+- A spaced repetition algorithm to deliberately shows you cards
+  you're less confident about more frequently
+- Switch from sqlite to postgresql
+- Port to UI over to the web
+- Also support pdfs, word files, powerpoint slides, audio recordings, etc
+- Make the model also optionally add diagrams and images to the flashcards
+- Test the flashcard generation. Do the flashcards work for math, for other subjects, etc?
+- Be able to export the flashcards to anki
+- Improve the readme and the docker container
+- Host the backend (and website) and publish to the play store
+- Find and load existing flashcard decks (not necessarily ai generated)
+- Extend the idea further and generate mock tests
+- Film devlogs, etc
