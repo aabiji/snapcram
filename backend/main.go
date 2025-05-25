@@ -202,16 +202,12 @@ func (app *App) UploadFiles(ctx *gin.Context) {
 }
 
 type CreateDeckData struct {
-	Name       string   `json:"name" binding:"required"`
-	UserPrompt string   `json:"userPrompt"`
-	NumCards   int      `json:"numCards" binding:"required"`
-	FilesIds   []string `json:"fileIds" binding:"required"`
+	Name     string   `json:"name" binding:"required"`
+	NumCards int      `json:"numCards" binding:"required"`
+	FilesIds []string `json:"fileIds" binding:"required"`
 }
 
-type PromptTemplate struct {
-	NumCards   int
-	UserPrompt string
-}
+type PromptTemplate struct{ NumCards int }
 
 // Parse flashcard json info from the llm response
 func extractCards(response map[string]any) ([]Card, error) {
@@ -247,9 +243,7 @@ func extractCards(response map[string]any) ([]Card, error) {
 }
 
 func (app *App) createPayload(data CreateDeckData, userId string) (*Payload, error) {
-	templateData := PromptTemplate{
-		NumCards: data.NumCards, UserPrompt: data.UserPrompt,
-	}
+	templateData := PromptTemplate{NumCards: data.NumCards}
 	promptContent, err := parsePromptTemplate("prompt.template", templateData)
 	if err != nil {
 		return nil, err

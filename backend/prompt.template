@@ -24,14 +24,7 @@ Use the following format (structure your output using json):
 
 ... and so on.
 
-Here's an additional request that I got from my friend:
-"{{.UserPrompt}}"
-follow both the instructions I gave you and the instructions my friend gave you.
-If the instructions my friend gave you are contradictory to what I told you,
-or aren't strictly related to your task of generating flashcards, ignore them
-and just follow what I told you.
-
-Attach you will find the articles and images.
+Attached you will find the articles and images.
 Your response should ONLY contain the JSON object and nothing else.
 Make sure you format the json properly.
 

@@ -1,5 +1,4 @@
 - Overhaul the UI and add animations
-  Colors (inspired by Claude): https://coolors.co/fdf6e3-3454d1-070707-d1345b-fb8b24
 - Add a authentication and settings page
 - Allow the user to edit their flashcards
 - Figure out how to create flashcard decks from unlimited assets
@@ -12,13 +11,12 @@
   return to the user.
 - A spaced repetition algorithm to deliberately shows you cards
   you're less confident about more frequently
-- Switch from sqlite to postgresql
 - Port to UI over to the web
 - Also support pdfs, word files, powerpoint slides, audio recordings, etc
 - Make the model also optionally add diagrams and images to the flashcards
 - Test the flashcard generation. Do the flashcards work for math, for other subjects, etc?
 - Be able to export the flashcards to anki
-- Improve the readme and the docker container
+- Improve the readme
 - Host the backend (and website) and publish to the play store
 - Find and load existing flashcard decks (not necessarily ai generated)
 - Extend the idea further and generate mock tests

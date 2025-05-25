@@ -57,7 +57,7 @@ export default Page;
 
 const styles = StyleSheet.create({
   container: {
-    paddingTop: 25,
+    paddingTop: 15,
     paddingRight: 20,
     paddingLeft: 20,
     height: "100%",
