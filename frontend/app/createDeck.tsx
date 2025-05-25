@@ -1,20 +1,18 @@
-// TODO: refactor this...
-
 import { router } from "expo-router";
-import * as ImagePicker from "expo-image-picker";
 
 import { useEffect, useState } from "react";
 import { StyleSheet } from "react-native";
 
-import { Button, Image, Input, H3, Text, Spinner, XStack, YStack } from "tamagui";
-import { Plus, Redo } from "@tamagui/lucide-icons";
+import { Button, Input, H3, Text, Spinner, XStack, YStack } from "tamagui";
+import { Redo } from "@tamagui/lucide-icons";
 
 import { Deck, ImageInfo, request, storageGet, storageSet } from "./lib/helpers";
 import { Page, Header } from "./components/page";
+import ImagePicker from "./components/imagePicker";
 
 enum States { UploadingImages, GeneratingCards, Error };
 
-export default function CreateDeck({ setDecks }: { setDecks: React.SetStateAction<Deck[]>}) {
+export default function CreateDeck() {
   const [name, setName] = useState("");
   const [numCards, setNumCards] = useState(0);
   const [images, setImages] = useState<ImageInfo[]>([]);
@@ -25,19 +23,6 @@ export default function CreateDeck({ setDecks }: { setDecks: React.SetStateActio
   const updateNumCards = (text: string) => {
     const num = Math.round(Number(text));
     setNumCards(Math.min(num, 20));
-  }
-
-  const pickImage = async () => {
-    const opts: ImagePicker.ImagePickerOptions = { mediaTypes: ["images"] };
-    const result = await ImagePicker.launchImageLibraryAsync(opts);
-    if (result.canceled) return;
-
-    const selection = result.assets
-                          .filter(asset => asset.uri && asset.mimeType)
-                          .map(asset => ({
-                            uri: asset.uri!, mimetype: asset.mimeType!
-                          }));
-    setImages(prev => [...prev, ...selection]);
   }
 
   const uploadImages = async () => {
@@ -80,7 +65,6 @@ export default function CreateDeck({ setDecks }: { setDecks: React.SetStateActio
         const list = storageGet<Deck[]>("decks") ?? [];
         const index = list.length;
         storageSet("decks", [...list, json]);
-        setDecks([...list, json]);
         router.push({pathname: "/viewDeck", params: {index}})
       } else {
         setState(States.Error);
@@ -115,18 +99,7 @@ export default function CreateDeck({ setDecks }: { setDecks: React.SetStateActio
             </XStack>
           </YStack>
 
-          <YStack>
-            <XStack justifyContent="space-between" alignItems="center">
-              <Text> Images </Text>
-              <Button transparent icon={<Plus scale={1.5} />} onPress={pickImage} />
-            </XStack>
-
-            <XStack style={styles.grid}>
-              {images.map((item, index) => {
-                <Image style={styles.gridItem} key={index} source={{ uri: item.uri }} />
-              })}
-            </XStack>
-          </YStack>
+          <ImagePicker setImages={setImages} images={images} />
 
           <Button
             themeInverse
@@ -168,21 +141,6 @@ export default function CreateDeck({ setDecks }: { setDecks: React.SetStateActio
 }
 
 const styles = StyleSheet.create({
-  grid: {
-    width: "100%",
-    margin: "auto",
-    flexWrap: "wrap",
-    gap: 8,
-    padding: 4,
-    borderWidth: 1,
-    borderStyle: "dashed",
-    borderRadius: 15
-  },
-  gridItem: {
-    width: "50%",
-    aspectRatio: 1,
-    borderRadius: 10
-  },
   button: {
     height: "8%",
     fontWeight: "bold"

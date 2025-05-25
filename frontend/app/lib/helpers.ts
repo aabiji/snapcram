@@ -49,4 +49,4 @@ export interface Flashcard { front: string; back: string; }
 
 export interface Deck { name: string; cards: Flashcard[]; }
 
-export interface ImageInfo { uri: string; mimetype: string; }
+export interface ImageInfo { uri: string; name: string; mimetype: string; }
