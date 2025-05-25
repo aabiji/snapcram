@@ -3,7 +3,7 @@ import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { StyleSheet } from "react-native";
 
-import { Button, Input, H3, Text, Spinner, XStack, YStack } from "tamagui";
+import { Button, Input, H4, Text, Spinner, XStack, YStack } from "tamagui";
 import { Redo } from "@tamagui/lucide-icons";
 
 import { Deck, ImageInfo, request, storageGet, storageSet } from "./lib/helpers";
@@ -17,7 +17,8 @@ export default function CreateDeck() {
   const [numCards, setNumCards] = useState(0);
   const [images, setImages] = useState<ImageInfo[]>([]);
 
-  const [buttonDisabled, setButtonDisabled] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [buttonDisabled, setButtonDisabled] = useState(true);
   const [state, setState] = useState(-1);
 
   const updateNumCards = (text: string) => {
@@ -68,14 +69,32 @@ export default function CreateDeck() {
         router.push({pathname: "/viewDeck", params: {index}})
       } else {
         setState(States.Error);
+        console.log(json);
       }
     } catch (error) {
       setState(States.Error);
     }
   }
 
+  const validateName = (): boolean => {
+    setErrorMessage("");
+    const n = name.trim();
+    if (n.length == 0) return false;
+
+    const decks = storageGet<Deck[]>("decks") ?? [];
+    for (let deck of decks) {
+      if (deck.name == n) {
+        setErrorMessage("Deck already exists");
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   useEffect(() => {
-    if (name.trim().length == 0 || numCards == 0 || images.length == 0)
+    if (!validateName()) return;
+    if (numCards == 0 || images.length == 0)
       setButtonDisabled(true);
     else
       setButtonDisabled(false);
@@ -84,9 +103,10 @@ export default function CreateDeck() {
   return (
     <Page header={<Header title="Create deck" />}>
       {state == -1 &&
-        <YStack gap={15} height="100%" overflowY="scroll">
-          <YStack gap={15}>
+        <YStack gap={8}>
+          <YStack gap={8}>
             <Input onChangeText={setName} placeholder="Name" />
+            {errorMessage.length > 0 && <Text style={styles.error}>{errorMessage}</Text>}
 
             <XStack alignItems="center" justifyContent="space-between">
               <Text>Number of cards</Text>
@@ -106,7 +126,6 @@ export default function CreateDeck() {
             disabledStyle={{ backgroundColor: "grey" }}
             disabled={buttonDisabled}
             onPress={uploadImages}
-            style={styles.button}
           >
             Create deck
           </Button>
@@ -114,35 +133,40 @@ export default function CreateDeck() {
       }
 
       {state == States.Error &&
-        <>
-          <H3>Something went wrong :(</H3>
+        <YStack flex={1} justifyContent="center" alignItems="center">
+          <H4>Something went wrong! </H4>
           <Button
+            themeInverse marginTop={25}
             onPress={() => setState(-1)}
-            themeInverse
-            iconAfter={<Redo rotate="180deg" />}
+            iconAfter={<Redo rotate="90deg" />}
           >
             Retry
           </Button>
-        </>
+        </YStack>
       }
 
       {state != -1 && state != States.Error &&
-        <>
-          <H3>
+        <YStack flex={1} justifyContent="center" alignItems="center">
+          <H4>
             {state == States.UploadingImages
               ? "Uploading your notes..."
-              : "Generating flashcards..."
-            }</H3>
-          <Spinner size="large" color="$blue10Light" />
-        </>
+              : "Creating flashcards..."
+            }
+          </H4>
+          <Spinner style={styles.spinner} size="large" color="$blue10Light" />
+        </YStack>
       }
     </Page>
   );
 }
 
 const styles = StyleSheet.create({
-  button: {
-    height: "8%",
-    fontWeight: "bold"
+  spinner: {
+    transform: [{ scale: 2.5 }],
+    marginTop: 45
+  },
+  error: {
+    fontSize: 12,
+    color: "red"
   }
 });

@@ -29,7 +29,7 @@ export function MainHeader() {
 // Headerbar on all other pages to navigate back to the main page
 export function Header({ title }: { title: string }) {
   return (
-    <XStack>
+    <XStack marginBottom={10}>
       <Button
         transparent marginLeft={-10} marginRight={10}
         icon={<ChevronLeft scale={2} />}
@@ -57,7 +57,7 @@ export default Page;
 
 const styles = StyleSheet.create({
   container: {
-    paddingTop: 15,
+    paddingTop: 10,
     paddingRight: 20,
     paddingLeft: 20,
     height: "100%",
