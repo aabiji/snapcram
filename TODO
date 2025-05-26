@@ -1,5 +1,5 @@
 - Overhaul the UI and add animations
-- Add a authentication and settings page
+- Add a authentication
 - Allow the user to edit their flashcards
 - Figure out how to create flashcard decks from unlimited assets
   What we could do is generate small sets of flashcards from each
@@ -16,7 +16,6 @@
 - Make the model also optionally add diagrams and images to the flashcards
 - Test the flashcard generation. Do the flashcards work for math, for other subjects, etc?
 - Be able to export the flashcards to anki
-- Improve the readme
 - Host the backend (and website) and publish to the play store
 - Find and load existing flashcard decks (not necessarily ai generated)
 - Extend the idea further and generate mock tests

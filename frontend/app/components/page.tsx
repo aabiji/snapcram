@@ -41,7 +41,7 @@ export function Header({ title }: { title: string }) {
 }
 
 export function Page(
-  { children, header }: { children: React.ReactNode, header: React.ReactNode }
+  { children, header }: { children: React.ReactNode, header?: React.ReactNode }
 ) {
   return (
     <SafeAreaView>
