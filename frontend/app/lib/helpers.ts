@@ -9,9 +9,7 @@ export const storageRemove = async (key: string) =>
 
 export function storageGet<T>(key: string, isString?: boolean): T | undefined {
   const str = SecureStore.getItem(key);
-  if (str !== null)
-    return isString ? str as T : JSON.parse(str) as unknown as T;
-  return undefined;
+  return str !== null ? JSON.parse(str) as unknown as T : undefined;
 }
 
 export const removeValue = async (key: string) =>

@@ -1,10 +1,10 @@
 import { router } from "expo-router";
 
 import React from "react";
-import { ScrollView, StyleSheet } from "react-native";
+import { StyleSheet } from "react-native";
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button, H3, XStack } from "tamagui";
+import { Button, H3, ScrollView, XStack } from "tamagui";
 import { ChevronLeft, Plus, Settings } from "@tamagui/lucide-icons";
 
 // Headerbar on the main page
@@ -45,7 +45,11 @@ export function Page(
 ) {
   return (
     <SafeAreaView>
-      <ScrollView style={styles.container} contentContainerStyle={{ flexGrow: 1 }}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={{ flexGrow: 1 }}
+        backgroundColor="$background"
+      >
         {header}
         {children}
       </ScrollView>

@@ -49,7 +49,7 @@ export default function Index() {
     const fallbackDecks = storageGet<Deck[]>("decks") ?? [];
 
     try {
-      const jwt = storageGet<string>("jwt", true);
+      const jwt = storageGet<string>("jwt");
       const response = await request("GET", "/userInfo", undefined, jwt);
       const json = await response.json();
 
@@ -67,7 +67,7 @@ export default function Index() {
   }
 
   const authenticate = async () => {
-    const jwt = storageGet<string>("jwt", true);
+    const jwt = storageGet<string>("jwt");
     if (jwt != null && jwt.length > 0) {
       fetchUserInfo();
       return;

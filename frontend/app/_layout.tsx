@@ -3,9 +3,13 @@ import { Stack } from "expo-router";
 import { TamaguiProvider } from "tamagui";
 import tamaguiConfig from "@/tamagui.config";
 
-export default function RootLayout() {
+import { ThemeProvider, useThemeContext } from "./components/themeContext";
+
+function LayoutContent() {
+  const  { theme } = useThemeContext();
+
   return (
-    <TamaguiProvider config={tamaguiConfig}>
+    <TamaguiProvider config={tamaguiConfig} defaultTheme={theme}>
       <Stack>
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="viewDeck" options={{ headerShown: false }} />
@@ -14,4 +18,8 @@ export default function RootLayout() {
       </Stack>
     </TamaguiProvider>
   );
+}
+
+export default function RootLayout() {
+  return <ThemeProvider><LayoutContent /></ThemeProvider>;
 }

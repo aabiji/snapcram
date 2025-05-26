@@ -81,7 +81,7 @@ const styles = StyleSheet.create({
   },
   card: {
     flex: 1,
-    backgroundColor: "white",
+    backgroundColor: "$background",
     justifyContent: "center",
     alignItems: "center",
     backfaceVisibility: "hidden", // Don't see through the card
