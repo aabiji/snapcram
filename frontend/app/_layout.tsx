@@ -1,19 +1,52 @@
 import { Stack } from "expo-router";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-import { TamaguiProvider } from "tamagui";
+import { Spinner, TamaguiProvider, View } from "tamagui";
 import tamaguiConfig from "@/tamagui.config";
 
 import { ThemeProvider, useThemeContext } from "./components/themeContext";
+import { request, storageGet } from "./lib/helpers";
 
 function LayoutContent() {
   const  { theme } = useThemeContext();
 
-  // TODO: check if the user is authenticated (ensuring the jwt isn't expired)
-  //       if the user is authenticated, go to the index route, else auth route,
-  //       then obviously, implement user authentication
-  const [defaultRoute, setDefaultRoute] = useState("auth");
+  const [defaultRoute, setDefaultRoute] = useState<string | undefined>(undefined);
+
+  // Figure out the first page we show the user when they open the app.
+  // If they're aren't authenticated into a valid session, redirect them
+  // to the authentication page, if they are, redirect them to the home page
+  const determineFirstPage = async () => {
+    const token = storageGet<string>("jwt", true);
+    if (token === undefined || token.length == 0) {
+      setDefaultRoute("auth");
+      return;
+    }
+
+    try {
+      const response = await request("GET", "/checkExpired", undefined, token);
+      const json = await response.json();
+
+      const jwtExpired = response.status == 200 && json["expired"];
+      const requestIssue = response.status == 406;
+
+      setDefaultRoute(jwtExpired || requestIssue ? "auth" : "index");
+    } catch (error) {
+      setDefaultRoute("networkIssue");
+    }
+  }
+
+  useEffect(() => { determineFirstPage(); }, []);
+
+  if (defaultRoute == undefined) {
+    return (
+    <TamaguiProvider config={tamaguiConfig} defaultTheme={theme}>
+      <View flex={1} justifyContent="center" alignItems="center">
+        <Spinner size="large" />
+      </View>
+    </TamaguiProvider>
+    );
+  }
 
   return (
     <TamaguiProvider config={tamaguiConfig} defaultTheme={theme}>

@@ -10,8 +10,10 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
 
@@ -100,6 +102,39 @@ func (app *App) getUserID(ctx *gin.Context) (string, error) {
 	return userId, nil
 }
 
+// Respond with whether the provided json web token is expired or close to expiring
+func (app *App) CheckJWTExpiry(ctx *gin.Context) {
+	tokenStr := ctx.GetHeader("Authorization")
+	if len(strings.Trim(tokenStr, " ")) == 0 {
+		handleResponse(ctx, http.StatusBadRequest, "no jwt found")
+		return
+	}
+
+	if tokenStr[0] == '"' { // Remove quotes if present
+		tokenStr = tokenStr[1 : len(tokenStr)-1]
+	}
+
+	token, err := parseToken(tokenStr, []byte(app.secrets["JWT_SECRET"]))
+	if err == jwt.ErrTokenExpired {
+		handleResponse(ctx, http.StatusOK, map[string]bool{"expired": true})
+		return
+	} else if err != nil {
+		handleResponse(ctx, http.StatusBadRequest, "invalid json web token")
+		return
+	}
+
+	expiryTime, err := token.Claims.GetExpirationTime()
+	if err != nil {
+		handleResponse(ctx, http.StatusBadRequest, nil)
+		return
+	}
+
+	// We'll count the token as expired if it's close to expiring
+	delta := time.Until(expiryTime.Time)
+	closeToExpiring := delta.Hours() <= 24
+	handleResponse(ctx, http.StatusOK, map[string]bool{"expired": closeToExpiring})
+}
+
 type AuthUserData struct {
 	Email           string `json:"email" binding:"required"`
 	Password        string `json:"password" binding:"required"`
@@ -115,33 +150,27 @@ func (app *App) AuthenticateUser(ctx *gin.Context) {
 
 	userId, err := app.db.validateUserCredentials(data.Email, data.Password)
 
-	// TODO: refactor this -- this is a nightmare!
-	// TODO; continue testing the authentication
-	if err == ErrUserNotFound && *data.ExistingAccount {
-		// User not found when trying to log in
-		fmt.Println(err)
-		handleResponse(ctx, http.StatusNotAcceptable, err.Error())
-		return
-	} else if err == ErrWrongPassword {
-		fmt.Println(err)
-		handleResponse(ctx, http.StatusNotAcceptable, err.Error())
-		return
-	} else if err != nil && err != ErrUserNotFound {
-		fmt.Println(err)
-		handleResponse(ctx, http.StatusInternalServerError, nil)
-		return
-	} else if err == nil && !*data.ExistingAccount {
-		// User already exists when trying to create a new account
-		handleResponse(ctx, http.StatusNotAcceptable, "user already exists")
-		return
-	}
+	if *data.ExistingAccount { // Loggin in
+		if err == ErrUserNotFound || err == ErrWrongPassword {
+			handleResponse(ctx, http.StatusNotAcceptable, err.Error())
+			return
+		} else if err != nil {
+			handleResponse(ctx, http.StatusInternalServerError, nil)
+			return
+		}
+	} else { // Creating an account
+		if err == nil {
+			handleResponse(ctx, http.StatusNotAcceptable, "user already exists")
+			return
+		} else if err != ErrUserNotFound {
+			handleResponse(ctx, http.StatusInternalServerError, nil)
+			return
+		}
 
-	// Insert a new user into the database
-	if !*data.ExistingAccount {
+		// Insert a new user into the database
 		userId = uuid.NewString()
 		err := app.db.insertUser(data.Email, data.Password, userId)
 		if err != nil {
-			fmt.Println(err)
 			handleResponse(ctx, http.StatusInternalServerError, nil)
 			return
 		}
@@ -150,7 +179,6 @@ func (app *App) AuthenticateUser(ctx *gin.Context) {
 	// Respond with a json web token containing the user id
 	tokenStr, err := createToken([]byte(app.secrets["JWT_SECRET"]), userId)
 	if err != nil {
-		fmt.Println(err)
 		handleResponse(ctx, http.StatusInternalServerError, nil)
 		return
 	}
@@ -385,6 +413,7 @@ func main() {
 	server := gin.Default()
 	server.MaxMultipartMemory = 10 << 20 // 10 MB upload max
 
+	server.GET("/checkExpired", app.CheckJWTExpiry)
 	server.POST("/authenticate", app.AuthenticateUser)
 	server.POST("/uploadFiles", app.UploadFiles)
 	server.POST("/createDeck", app.CreateDeck)

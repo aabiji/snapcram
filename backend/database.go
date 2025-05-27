@@ -75,7 +75,7 @@ func (db *Database) userExists(userId string) (bool, error) {
 
 // Check that the password is correct and points to an existing account
 // then return the associated user id
-var ErrUserNotFound error = fmt.Errorf("user not found")
+var ErrUserNotFound error = fmt.Errorf("user with email not found")
 var ErrWrongPassword error = fmt.Errorf("incorrect password")
 
 func (db *Database) validateUserCredentials(email, password string) (string, error) {

@@ -1,11 +1,31 @@
 import { router } from "expo-router";
 import * as Crypto from "expo-crypto";
 
-import { useEffect, useState } from "react";
-import { Anchor, Button, Card, H2, Input, Text, View } from "tamagui";
+import { useState } from "react";
+import { Anchor, Button, Card, H2, Input, Spinner, Text, View } from "tamagui";
+import { Eye, EyeOff } from "@tamagui/lucide-icons";
 
 import Page from "./components/page";
 import { request, storageSet } from "./lib/helpers";
+
+function PasswordInput({ setPassword, placeholder }) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <View flex={1} flexDirection="row" position="relative">
+      <Input
+        flexGrow={1}
+        placeholder={placeholder} secureTextEntry={!visible}
+        onChangeText={(text) => setPassword(text.trim())}>
+      </Input>
+      <Button
+        transparent
+        position="absolute" right={0}
+        onPress={() => setVisible(!visible)}
+        icon={visible ? <EyeOff scale={1.5} /> : <Eye scale={1.5} />}
+      />
+    </View>
+  )
+}
 
 export default function AuthPage() {
   const [email, setEmail] = useState("");
@@ -13,22 +33,25 @@ export default function AuthPage() {
   const [repeatedPassword, setRepeatedPassword] = useState("");
 
   const [error, setError] = useState("");
-  const [buttonEnabled, setButtonEnabled] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [creatingAccount, setCreatingAccount] = useState(false);
 
-  useEffect(() => {
-    const filled = email.length > 0 && password.length > 0;
-    setButtonEnabled(
-      creatingAccount ? filled && repeatedPassword.length > 0 : filled
-    );
-  }, [email, password, repeatedPassword]);
-
   const validateInputs = (): boolean => {
+    const base = email.length > 0 && password.length > 0
+    const filled = creatingAccount ? base && repeatedPassword.length > 0 : base;
+    if (!filled) {
+      setError("Please fill out all the fields");
+      return false;
+    }
+
     const emailValidate = /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/;
     if (!emailValidate.test(email)) {
       setError("Please enter a valid email address");
       return false;
     }
+
+    // Only validate email when logging in
+    if (!creatingAccount) return true;
 
     const minPasswordLength = 8;
     if (password.length < minPasswordLength) {
@@ -42,7 +65,7 @@ export default function AuthPage() {
       return false;
     }
 
-    if (creatingAccount && repeatedPassword != password) {
+    if (repeatedPassword != password) {
       setError("The passwords don't match");
       return false;
     }
@@ -50,13 +73,9 @@ export default function AuthPage() {
     return true;
   };
 
-  // TODO: dedicated password input with eye to hide/show
-  // TODO: force the user to authenticate if they don't have token,
-  //       or their token is expired
-  //       if there are network issues, then show a dedicated page for that ("no wifi :(" or something),
-  //       until the network issues are resolved
   const authenticate = async () => {
     if (!validateInputs()) return;
+    setLoading(true);
 
     try {
       const digest = await Crypto.digestStringAsync(
@@ -70,7 +89,6 @@ export default function AuthPage() {
       const json = await response.json();
 
       if (response.status == 200) {
-        console.log("success!");
         storageSet("jwt", json["token"]);
         router.navigate("/");
       } else if (response.status == 406) {
@@ -80,12 +98,12 @@ export default function AuthPage() {
         setError(msg);
       } else {
         setError("Something went wrong...");
-        console.log("invalid request!");
       }
-
     } catch (error) {
       setError("Something went wrong...");
     }
+
+    setLoading(false);
   }
 
   return (
@@ -96,23 +114,25 @@ export default function AuthPage() {
         <Card gap={25} padding={5}>
           {error.length > 0 && <Text color="red" textAlign="center">{error}</Text>}
 
-          <Input inputMode="email" onChangeText={(text) => setEmail(text.trim())} placeholder="Email" />
-          <Input onChangeText={(text) => setPassword(text.trim())} placeholder="Password" />
+          <Input
+            inputMode="email" autoCapitalize="none"
+            onChangeText={(text) => setEmail(text.trim())}
+            placeholder="Email"
+          />
+          <PasswordInput setPassword={setPassword} placeholder="Password" />
 
           {creatingAccount &&
-            <Input
-              onChangeText={(text) => setRepeatedPassword(text.trim())}
+            <PasswordInput
+              setPassword={setRepeatedPassword}
               placeholder="Repeat password"
             />
           }
 
-          <Button
-            themeInverse
-            onPress={authenticate}
-            disabled={!buttonEnabled}
-            disabledStyle={{ backgroundColor: "grey" }}
-          >
-            {creatingAccount ? "Create account" : "Login"}
+          <Button themeInverse onPress={authenticate}>
+            {loading
+                ? <Spinner size="large" color="$white" />
+                : creatingAccount ? "Create account" : "Login"
+            }
           </Button>
 
           <Anchor
