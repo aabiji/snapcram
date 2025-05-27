@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet } from "react-native";
+import { Pressable } from "react-native";
 
 import { Button, Card, Text, XStack, YStack } from "tamagui";
 import { ChevronRight, ChevronDown, Pen, Repeat, Trash } from "@tamagui/lucide-icons";
@@ -14,7 +14,7 @@ function DeckCard({ deck, index }: { deck: Deck, index: number }) {
 
   return (
     <Pressable>
-      <Card style={styles.card} bordered>
+      <Card width="100%" padding={15} bordered>
         <XStack justifyContent="space-between" width="100%">
           <YStack>
             <Text fontWeight="bold">{deck.name}</Text>
@@ -66,30 +66,7 @@ export default function Index() {
     }
   }
 
-  const authenticate = async () => {
-    const jwt = storageGet<string>("jwt");
-    if (jwt != null && jwt.length > 0) {
-      fetchUserInfo();
-      return;
-    }
-
-    try {
-      const response = await request("POST", "/createUser");
-
-      if (response.status == 200) {
-        const json = await response.json();
-        storageSet("jwt", json["token"]);
-      } else {
-        console.log("Request failed", response.status, response?.toString());
-      }
-    } catch (error) {
-      console.log("Couldn't send a request!", error);
-    }
-
-    fetchUserInfo();
-  }
-
-  useEffect(() => { authenticate(); }, []);
+  useEffect(() => { fetchUserInfo(); }, []);
 
   return (
     <Page header={<MainHeader />}>
@@ -101,10 +78,3 @@ export default function Index() {
     </Page>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    width: "100%",
-    padding: 15,
-  },
-});

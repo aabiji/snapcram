@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -26,7 +28,11 @@ func NewDatabase(url string) (Database, error) {
 
 	// Setup the tables
 	statement := `
-		create table if not exists Users (ID text not null);
+		create table if not exists Users (
+			ID text not null,
+			Email text not null,
+			Password text not null
+		);
 		create table if not exists Decks (
 			ID serial not null primary key,
 			UserID text not null,
@@ -48,27 +54,47 @@ func NewDatabase(url string) (Database, error) {
 
 func (db *Database) Close() { db.pool.Close() }
 
-func (db *Database) rowExists(query string, values ...any) (bool, error) {
-	rows, err := db.pool.Query(context.Background(), query, values...)
-	if err != nil {
-		return false, err
-	}
-	defer rows.Close()
-	return rows.Next(), nil
-}
-
-func (db *Database) insertUser(userId string) error {
-	statement := "insert into Users (ID) values ($1)"
-	_, err := db.pool.Exec(context.Background(), statement, userId)
+func (db *Database) insertUser(email, password, userId string) error {
+	statement := "insert into Users (ID, Email, Password) values ($1, $2, $3)"
+	_, err := db.pool.Exec(
+		context.Background(), statement, userId, email, password)
 	return err
 }
 
 func (db *Database) userExists(userId string) (bool, error) {
-	exists, err := db.rowExists("select * from Users where ID = $1", userId)
+	sql := "select * from Users where ID = $1"
+	rows, err := db.pool.Query(context.Background(), sql, userId)
 	if err != nil {
 		return false, err
 	}
+
+	exists := rows.Next()
+	rows.Close()
 	return exists, nil
+}
+
+// Check that the password is correct and points to an existing account
+// then return the associated user id
+var ErrUserNotFound error = fmt.Errorf("user not found")
+var ErrWrongPassword error = fmt.Errorf("incorrect password")
+
+func (db *Database) validateUserCredentials(email, password string) (string, error) {
+	str := "select ID, Password from Users where Email = $1"
+	row := db.pool.QueryRow(context.Background(), str, email)
+
+	var userId, existingPassword string
+	err := row.Scan(&userId, &existingPassword)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return "", ErrUserNotFound
+		}
+		return "", err
+	}
+
+	if password != existingPassword {
+		return "", ErrWrongPassword
+	}
+	return userId, nil
 }
 
 func (db *Database) insertDeck(userId string, deck Deck) error {

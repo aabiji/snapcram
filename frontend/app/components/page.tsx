@@ -65,6 +65,7 @@ const styles = StyleSheet.create({
     paddingRight: 20,
     paddingLeft: 20,
     height: "100%",
-    width: "100%"
+    width: "100%",
+    fontFamily: "Lexend"
   }
 });

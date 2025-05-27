@@ -49,7 +49,7 @@ func NewApp() (App, error) {
 
 // Write response json that either holds an error message or some custom data
 func handleResponse(ctx *gin.Context, statusCode int, object any) {
-	message := ""
+	message := "unacceptable request"
 	if statusCode == http.StatusNotFound {
 		message = "Page not found!"
 	} else if statusCode == http.StatusInternalServerError {
@@ -100,17 +100,57 @@ func (app *App) getUserID(ctx *gin.Context) (string, error) {
 	return userId, nil
 }
 
-// Create a user and respond with a json web token containing the user'd ID
-func (app *App) CreateUser(ctx *gin.Context) {
-	userId := uuid.NewString()
-	err := app.db.insertUser(userId)
-	if err != nil {
-		handleResponse(ctx, http.StatusInternalServerError, nil)
+type AuthUserData struct {
+	Email           string `json:"email" binding:"required"`
+	Password        string `json:"password" binding:"required"`
+	ExistingAccount *bool  `json:"existing" binding:"required"`
+}
+
+func (app *App) AuthenticateUser(ctx *gin.Context) {
+	var data AuthUserData
+	if err := ctx.ShouldBindJSON(&data); err != nil {
+		handleResponse(ctx, http.StatusBadRequest, nil)
 		return
 	}
 
+	userId, err := app.db.validateUserCredentials(data.Email, data.Password)
+
+	// TODO: refactor this -- this is a nightmare!
+	// TODO; continue testing the authentication
+	if err == ErrUserNotFound && *data.ExistingAccount {
+		// User not found when trying to log in
+		fmt.Println(err)
+		handleResponse(ctx, http.StatusNotAcceptable, err.Error())
+		return
+	} else if err == ErrWrongPassword {
+		fmt.Println(err)
+		handleResponse(ctx, http.StatusNotAcceptable, err.Error())
+		return
+	} else if err != nil && err != ErrUserNotFound {
+		fmt.Println(err)
+		handleResponse(ctx, http.StatusInternalServerError, nil)
+		return
+	} else if err == nil && !*data.ExistingAccount {
+		// User already exists when trying to create a new account
+		handleResponse(ctx, http.StatusNotAcceptable, "user already exists")
+		return
+	}
+
+	// Insert a new user into the database
+	if !*data.ExistingAccount {
+		userId = uuid.NewString()
+		err := app.db.insertUser(data.Email, data.Password, userId)
+		if err != nil {
+			fmt.Println(err)
+			handleResponse(ctx, http.StatusInternalServerError, nil)
+			return
+		}
+	}
+
+	// Respond with a json web token containing the user id
 	tokenStr, err := createToken([]byte(app.secrets["JWT_SECRET"]), userId)
 	if err != nil {
+		fmt.Println(err)
 		handleResponse(ctx, http.StatusInternalServerError, nil)
 		return
 	}
@@ -345,7 +385,7 @@ func main() {
 	server := gin.Default()
 	server.MaxMultipartMemory = 10 << 20 // 10 MB upload max
 
-	server.POST("/createUser", app.CreateUser)
+	server.POST("/authenticate", app.AuthenticateUser)
 	server.POST("/uploadFiles", app.UploadFiles)
 	server.POST("/createDeck", app.CreateDeck)
 	server.GET("/userInfo", app.GetUserInfo)
