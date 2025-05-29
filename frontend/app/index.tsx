@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Pressable } from "react-native";
 
-import { Button, Card, Text, XStack, YStack } from "tamagui";
+import { Button, Card, H4, Text, XStack, YStack } from "tamagui";
 import { ChevronRight, ChevronDown, Pen, Repeat, Trash } from "@tamagui/lucide-icons";
 
 import { router } from "expo-router";
@@ -45,32 +45,26 @@ function DeckCard({ deck, index }: { deck: Deck, index: number }) {
 export default function Index() {
   const [decks, setDecks] = useState<Deck[]>([]);
 
-  const fetchUserInfo = async () => {
-    const fallbackDecks = storageGet<Deck[]>("decks") ?? [];
-
-    try {
-      const jwt = storageGet<string>("jwt");
-      const response = await request("GET", "/userInfo", undefined, jwt);
-      const json = await response.json();
-
-      if (response.status == 200) {
-        storageSet("decks", json["decks"]);
-        setDecks(json["decks"]);
-      } else {
-        console.log("error!", json);
-        setDecks(fallbackDecks);
-      }
-    } catch (error) {
-        console.log("error!", error);
-        setDecks(fallbackDecks);
-    }
-  }
-
-  useEffect(() => { fetchUserInfo(); }, []);
+  useEffect(() => {
+    const stored = storageGet<Deck[]>("decks") ?? [];
+    setDecks(stored);
+  }, []);
 
   return (
     <Page header={<MainHeader />}>
-      <YStack gap={25} paddingTop={20}>
+      <YStack gap={25} paddingTop={20} flex={1}>
+        {decks.length == 0 &&
+          <YStack flex={1} justifyContent="center">
+            <H4
+              textAlign="center"
+              color="dimgrey"
+              alignSelf="center"
+            >
+              Create a new flashcard deck to get started
+            </H4>
+          </YStack>
+        }
+
         {decks.map((item, index) => (
           <DeckCard deck={item} index={index}  key={index} />
         ))}

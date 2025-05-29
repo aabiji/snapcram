@@ -1,13 +1,5 @@
 - Overhaul the UI and add animations
 - Allow the user to edit their flashcards
-- Figure out how to create flashcard decks from unlimited assets
-  What we could do is generate small sets of flashcards from each
-  batch (group of assets). When we've processed all the batches,
-  we can combine all the flashcard sets together then prompt the
-  llm *again* to cohesively tie all the flashcards together,
-  remove lower quality flashcards, create new flashcards from the
-  flashcards, etc. Then that final combined set of flashcards is
-  return to the user.
 - A spaced repetition algorithm to deliberately shows you cards
   you're less confident about more frequently
 - Port to UI over to the web
@@ -19,7 +11,7 @@
 - Find and load existing flashcard decks (not necessarily ai generated)
 - Extend the idea further and generate mock tests
 - Design logo and art
-- Film devlogs, etc
+- Add logging to the backend
 
 - https://www.namecheap.com/domains/domain-name-search/
 - https://cloud.google.com/free/docs/free-cloud-features#free-tier

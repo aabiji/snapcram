@@ -1,0 +1,29 @@
+You are given a list of flashcards in the following JSON format:
+
+{
+    "cards": [
+        {
+            "front": "The front of the card (always a string)",
+            "back": "The back of the card (always a string)"
+        },
+        ...
+    ]
+}
+
+Input flashcards:
+{{.Cards}}
+
+Your task is to produce a refined set of exactly {{.NumCards}} high-quality flashcards. To do this:
+
+- Analyze the given cards to identify high-value content.
+- Select the most meaningful, information-rich, or representative cards.
+- Combine overlapping or similar cards into new, more effective flashcards.
+    - For example, two flashcards with simple, related answers might be combined into one more challenging or comprehensive card.
+- Remove any cards that are redundant, too simple, or less informative.
+
+Your goal is to maximize clarity, learning effectiveness, and information density across the selected flashcards.
+
+### Output Format:
+Return the final flashcards in exactly the same JSON format as the input. Do not include explanations, comments, or any text outside of the JSON block. Ensure the JSON is syntactically valid.
+
+Now, please return the optimized flashcard set, you got this!

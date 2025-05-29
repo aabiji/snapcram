@@ -48,6 +48,10 @@ func parsePromptTemplate(path string, data any) (string, error) {
 // This way, we can let the user parse the api response however they see fit
 type ResponseHandler[R any] func(map[string]any) (R, error)
 
+// TODO: when prompting the llm, sometimes it fails (500 - internal server error)
+//       so it seems like there was an error when really there was none,
+//       we should retry requests
+
 // Use the Groq api to prompt an LLM and return the potential LLM outputs
 func promptGroqLLM[R any](payload Payload, apiKey string, F ResponseHandler[R]) (R, error) {
 	var zero R
