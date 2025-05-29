@@ -1,5 +1,9 @@
 package main
 
+// TODO: when prompting the llm, sometimes it fails (500 - internal server error)
+//       so it seems like there was an error when really there was none,
+//       we should retry requests
+
 import (
 	"context"
 	"encoding/json"
@@ -85,6 +89,17 @@ func (app *App) getUserID(ctx *gin.Context) (string, error) {
 		return "", fmt.Errorf("invalid json web token")
 	}
 
+	// Check if the token is about to get expired
+	expiryTime, err := token.Claims.GetExpirationTime()
+	if err != nil {
+		return "", err
+	}
+
+	closeToExpiring := time.Until(expiryTime.Time).Hours() <= 24
+	if closeToExpiring {
+		return "", jwt.ErrTokenExpired
+	}
+
 	userId, err := token.Claims.GetSubject()
 	if err != nil {
 		return "", fmt.Errorf("json web token doesn't contain the user's id")
@@ -100,39 +115,6 @@ func (app *App) getUserID(ctx *gin.Context) (string, error) {
 	}
 
 	return userId, nil
-}
-
-// Respond with whether the provided json web token is expired or close to expiring
-func (app *App) CheckJWTExpiry(ctx *gin.Context) {
-	tokenStr := ctx.GetHeader("Authorization")
-	if len(strings.Trim(tokenStr, " ")) == 0 {
-		handleResponse(ctx, http.StatusBadRequest, "no jwt found")
-		return
-	}
-
-	if tokenStr[0] == '"' { // Remove quotes if present
-		tokenStr = tokenStr[1 : len(tokenStr)-1]
-	}
-
-	token, err := parseToken(tokenStr, []byte(app.secrets["JWT_SECRET"]))
-	if err == jwt.ErrTokenExpired {
-		handleResponse(ctx, http.StatusOK, map[string]bool{"expired": true})
-		return
-	} else if err != nil {
-		handleResponse(ctx, http.StatusBadRequest, "invalid json web token")
-		return
-	}
-
-	expiryTime, err := token.Claims.GetExpirationTime()
-	if err != nil {
-		handleResponse(ctx, http.StatusBadRequest, nil)
-		return
-	}
-
-	// We'll count the token as expired if it's close to expiring
-	delta := time.Until(expiryTime.Time)
-	closeToExpiring := delta.Hours() <= 24
-	handleResponse(ctx, http.StatusOK, map[string]bool{"expired": closeToExpiring})
 }
 
 type AuthUserData struct {
@@ -189,20 +171,25 @@ func (app *App) AuthenticateUser(ctx *gin.Context) {
 
 // Response with all of the user's decks
 func (app *App) GetUserInfo(ctx *gin.Context) {
+	response := map[string]any{"decks": nil, "tokenExpired": true}
+
 	userId, err := app.getUserID(ctx)
-	if err != nil {
+	if err == jwt.ErrTokenExpired {
+		handleResponse(ctx, http.StatusOK, response)
+		return
+	} else if err != nil {
 		handleResponse(ctx, http.StatusBadRequest, "Authentication required")
 		return
 	}
 
 	decks, err := app.db.getDecks(userId)
 	if err != nil {
-		fmt.Println(err)
 		handleResponse(ctx, http.StatusInternalServerError, nil)
 		return
 	}
 
-	response := map[string]any{"decks": decks}
+	response["decks"] = decks
+	response["tokenExpired"] = false
 	handleResponse(ctx, http.StatusOK, response)
 }
 
@@ -312,7 +299,7 @@ func extractCards(response map[string]any) ([]Card, error) {
 
 func (app *App) createPayload(data CreateDeckData, userId string) (*Payload, error) {
 	templateData := PromptTemplate{NumCards: data.NumCards}
-	promptContent, err := parsePromptTemplate("prompt.template", templateData)
+	promptContent, err := parsePromptTemplate("prompts/batch.template", templateData)
 	if err != nil {
 		return nil, err
 	}
@@ -377,18 +364,21 @@ func (app *App) CreateDeck(ctx *gin.Context) {
 
 	payload, err := app.createPayload(data, userId)
 	if err != nil {
+		fmt.Println("couldn't create the payload", err.Error())
 		handleResponse(ctx, http.StatusInternalServerError, nil)
 		return
 	}
 
 	cards, err := promptGroqLLM(*payload, app.secrets["GROQ_API_KEY"], extractCards)
 	if err != nil {
+		fmt.Println("couldn't prompt the groq llm", err.Error())
 		handleResponse(ctx, http.StatusInternalServerError, nil)
 		return
 	}
 
 	err = app.db.insertDeck(userId, Deck{Name: data.Name, Cards: cards})
 	if err != nil {
+		fmt.Println("coudln't insert the deck", err.Error())
 		handleResponse(ctx, http.StatusInternalServerError, nil)
 		return
 	}
@@ -413,7 +403,6 @@ func main() {
 	server := gin.Default()
 	server.MaxMultipartMemory = 10 << 20 // 10 MB upload max
 
-	server.GET("/checkExpired", app.CheckJWTExpiry)
 	server.POST("/authenticate", app.AuthenticateUser)
 	server.POST("/uploadFiles", app.UploadFiles)
 	server.POST("/createDeck", app.CreateDeck)
