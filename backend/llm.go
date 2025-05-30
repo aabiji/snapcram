@@ -1,47 +1,14 @@
 package main
 
-// TODO: now modify the frontend too
-
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"html/template"
 	"io"
 	"mime/multipart"
 	"net/http"
-	"strings"
 )
-
-func parseTemplate(path string, data any) (string, error) {
-	t, err := template.ParseFiles(path)
-	if err != nil {
-		return "", err
-	}
-
-	output := &strings.Builder{}
-	err = t.Execute(output, data)
-
-	return output.String(), err
-}
-
-// Read a file from a path and return its contents encoded in base64
-func base64EncodeFile(file io.Reader, mimetype string) (string, error) {
-	bytes, err := io.ReadAll(file)
-	if err != nil {
-		return "", err
-	}
-
-	builder := &strings.Builder{}
-	encoder := base64.NewEncoder(base64.StdEncoding, builder)
-	encoder.Write(bytes)
-	encoder.Close()
-
-	formatted := fmt.Sprintf("data:%s;base64,%s", mimetype, builder.String())
-	return formatted, nil
-}
 
 type ImageUrl struct {
 	Url string `json:"url"`
@@ -135,6 +102,7 @@ func extractCards(response map[string]any) ([]Card, error) {
 	return contentData.Cards, nil
 }
 
+// Create a a bunch of flashcard drafts from a batch of assets
 func createFlashcardDrafts(
 	apiKey string, userId string, files []*multipart.FileHeader,
 ) ([]Card, error) {
@@ -154,10 +122,10 @@ func createFlashcardDrafts(
 	for _, file := range files {
 		reader, err := file.Open()
 		if err != nil {
+			reader.Close()
 			return nil, err
 		}
-		// TODO: we need to be closing somewhere here....
-		file.Close()
+		reader.Close()
 
 		content, err := base64EncodeFile(reader, file.Header.Get("Content-Type"))
 		if err != nil {
@@ -192,6 +160,7 @@ func createFlashcardDrafts(
 	return cards, err
 }
 
+// Create a flashcard deck from a bunch of flashcard drafts
 func createFlashcardDeck(
 	apiKey string, userId string, drafts []Card, deckSize int,
 ) ([]Card, error) {

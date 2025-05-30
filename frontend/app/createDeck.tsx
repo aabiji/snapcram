@@ -6,20 +6,22 @@ import { StyleSheet } from "react-native";
 import { Button, Input, H4, Text, Spinner, XStack, YStack } from "tamagui";
 import { Redo } from "@tamagui/lucide-icons";
 
-import { storageGet, storageSet } from "./lib/helpers";
-import { createFlashcardDeck, Deck, ImageInfo } from "./lib/generate";
+import {
+  storageGet, storageSet, request,
+  Asset, Deck, Flashcard
+} from "./lib/helpers";
 import { Page, Header } from "./components/page";
 import ImagePicker from "./components/imagePicker";
 
-enum States { GeneratingCards, Error };
+enum States { None, Generating, Error };
 
 export default function CreateDeck() {
   const [name, setName] = useState("");
   const [numCards, setNumCards] = useState(0);
-  const [images, setImages] = useState<ImageInfo[]>([]);
+  const [images, setImages] = useState<Asset[]>([]);
 
   const [errorMessage, setErrorMessage] = useState("");
-  const [state, setState] = useState(-1);
+  const [state, setState] = useState(States.None);
   const [jwt, setJwt] = useState<string>("");
 
   const updateNumCards = (text: string) => {
@@ -27,47 +29,77 @@ export default function CreateDeck() {
     setNumCards(Math.min(num, 50));
   }
 
-  const validateName = (): boolean => {
-    setErrorMessage("");
-    const n = name.trim();
-    if (n.length == 0) return false;
-
-    const decks = storageGet<Deck[]>("decks") ?? [];
-    for (let deck of decks) {
-      if (deck.name == n) {
-        setErrorMessage("Deck already exists");
-        return false;
-      }
+  const validateForm = (): boolean => {
+    if (name.length == 0) {
+      setErrorMessage("Must specify the deck name");
+      return false;
     }
 
-    return true;
-  }
-
-  const createDeck = () => {
-    if (!validateName()) return;
+    const decks = storageGet<Deck[]>("decks") ?? [];
+    const same = decks.find(deck => deck.name == name);
+    if (same !== undefined) {
+        setErrorMessage("Deck already exists");
+        return false;
+    }
 
     if (numCards == 0) {
       setErrorMessage("Must specify the number of cards to generate");
-      return;
+      return false;
     }
 
     if (images.length == 0) {
       setErrorMessage("Must upload images");
-      return;
+      return false;
     }
 
-    setState(States.GeneratingCards);
+    setErrorMessage("");
+    return true;
+  }
+
+  const processBatch = async (batch: Asset[]): Promise<Flashcard[]> => {
+    const formData = new FormData();
+    for (let asset of batch) {
+      formData.append("files", {
+        uri: asset.uri, type: asset.mimetype, name: asset.uri
+      });
+    }
+
+    const response = await request("POST", "/upload", formData, jwt);
+    const json = await response.json();
+    if (response.status == 200)
+      return json["cards"];
+    else {
+      throw new Error(`${response.status} ${json["message"]} ${json["details"]}`)
+    }
+  }
+
+  const createDeck = async () => {
+    if (!validateForm()) return;
+    setState(States.Generating);
 
     try {
-      const deck = createFlashcardDeck(images, jwt, name.trim(), numCards);
+      const batchSize = 5;
+      const numBatches = Math.floor(images.length / batchSize);
+      let cards = [];
+
+      for (let i = 0; i < numBatches; i++) {
+        const batch = images.slice(i * batchSize, i * batchSize + batchSize);
+        const set = await processBatch(batch);
+        cards.push(...set);
+      }
+
+      const payload = { name, deckSize: numCards, cards };
+      const response = await request("POST", "/createDeck", payload, jwt);
+      const json = await response.json();
+
       const list = storageGet<Deck[]>("decks") ?? [];
-      storageSet("decks", [...list, deck]);
+      storageSet("decks", [...list, json]);
       router.push({pathname: "/viewDeck", params: {index: list.length}})
     } catch (error) {
       console.log(error);
       setState(States.Error);
     }
-  };
+  }
 
   useEffect(() => {
       const token = storageGet<string>("jwt")!;
@@ -76,10 +108,10 @@ export default function CreateDeck() {
 
   return (
     <Page header={<Header title="Create deck" />}>
-      {state == -1 &&
+      {state == States.None &&
         <YStack gap={8}>
           <YStack gap={8}>
-            <Input onChangeText={setName} placeholder="Name" />
+            <Input onChangeText={(text) => setName(text.trim())} placeholder="Name" />
             {errorMessage.length > 0 && <Text style={styles.error}>{errorMessage}</Text>}
 
             <XStack alignItems="center" justifyContent="space-between">
@@ -105,7 +137,7 @@ export default function CreateDeck() {
           <H4>Something went wrong! </H4>
           <Button
             themeInverse marginTop={25}
-            onPress={() => setState(-1)}
+            onPress={() => setState(States.None)}
             iconAfter={<Redo rotate="90deg" />}
           >
             Retry
@@ -113,7 +145,7 @@ export default function CreateDeck() {
         </YStack>
       }
 
-      {state != -1 && state != States.Error &&
+      {state == States.Generating &&
         <YStack flex={1} justifyContent="center" alignItems="center">
           <H4>Creating flashcards...</H4>
           <Spinner style={styles.spinner} size="large" color="$blue10Light" />

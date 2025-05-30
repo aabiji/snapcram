@@ -20,15 +20,6 @@ type App struct {
 	maxFileSize int64
 }
 
-func readEnvironmentVariables() map[string]string {
-	values := map[string]string{}
-	for _, value := range os.Environ() {
-		pair := strings.SplitN(value, "=", 2)
-		values[pair[0]] = pair[1]
-	}
-	return values
-}
-
 func NewApp() (App, error) {
 	secrets := readEnvironmentVariables()
 
@@ -42,12 +33,8 @@ func NewApp() (App, error) {
 		return App{}, err
 	}
 
-	return App{
-		db:          db,
-		storage:     storage,
-		secrets:     secrets,
-		maxFileSize: 32 << 20, // 32 megabytes
-	}, nil
+	maxFileSize := int64(32 << 20) // 32 megabytes
+	return App{db, storage, secrets, maxFileSize}, nil
 }
 
 // Each batch should hold at most 5 files
