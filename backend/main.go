@@ -1,13 +1,9 @@
 package main
 
 import (
-	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -21,19 +17,20 @@ type App struct {
 	db          Database
 	storage     CloudStorage
 	secrets     map[string]string
-	inDebugMode bool
 	maxFileSize int64
+}
+
+func readEnvironmentVariables() map[string]string {
+	values := map[string]string{}
+	for _, value := range os.Environ() {
+		pair := strings.SplitN(value, "=", 2)
+		values[pair[0]] = pair[1]
+	}
+	return values
 }
 
 func NewApp() (App, error) {
 	secrets := readEnvironmentVariables()
-
-	debugVar := os.Getenv("DEBUG_MODE")
-	mode := strings.Trim(debugVar, " ")
-	if len(mode) == 0 {
-		panic("DEBUG_MODE environment variable not set")
-	}
-	inDebugMode := mode == "1"
 
 	db, err := NewDatabase(secrets["DATABASE_URL"])
 	if err != nil {
@@ -44,14 +41,26 @@ func NewApp() (App, error) {
 	if err != nil {
 		return App{}, err
 	}
-	storage.allowedMimetypes = []string{"image/png", "image/jpeg"}
 
-	maxFileSize := int64(32 << 20) // 32 megabytes
-
-	return App{db, storage, secrets, inDebugMode, maxFileSize}, nil
+	return App{
+		db:          db,
+		storage:     storage,
+		secrets:     secrets,
+		maxFileSize: 32 << 20, // 32 megabytes
+	}, nil
 }
 
-func (app *App) maxUploadSize() int64 { return int64(app.maxFileSize * 5) }
+// Each batch should hold at most 5 files
+func (app *App) fileUploadLimit() int64 { return app.maxFileSize * 5 }
+
+func (app *App) inDebugMode() bool {
+	debugVar := app.secrets["DEBUG_MODE"]
+	mode := strings.Trim(debugVar, " ")
+	if len(mode) == 0 {
+		panic("DEBUG_MODE environment variable not set")
+	}
+	return mode == "1"
+}
 
 // Write response json that either holds an error message or some custom data
 func handleResponse(ctx *gin.Context, statusCode int, object any) {
@@ -193,8 +202,9 @@ func (app *App) GetUserInfo(ctx *gin.Context) {
 	handleResponse(ctx, http.StatusOK, response)
 }
 
-// Upload a batch of files and respond with a list of corresponding file ids
-func (app *App) UploadAssetBatch(ctx *gin.Context) {
+// Generate a set of flashcards using the uploaded files. Those
+// flashcards will then be used to create a flashcard deck
+func (app *App) GenerateFlashcards(ctx *gin.Context) {
 	userId, err := app.getUserID(ctx)
 	if err != nil {
 		handleResponse(ctx, http.StatusBadRequest, err.Error())
@@ -207,14 +217,14 @@ func (app *App) UploadAssetBatch(ctx *gin.Context) {
 		return
 	}
 
-	// Download the files
 	files, ok := form.File["files"]
 	if !ok {
 		handleResponse(ctx, http.StatusBadRequest, "No attached files")
 		return
 	}
 
-	fileIds := []string{}
+	// Make sure the uploaded files are valid
+	allowedMimetypes := []string{"image/png", "image/jpeg"}
 	for _, file := range files {
 		if file.Size > app.maxFileSize {
 			msg := fmt.Sprintf("%s: too big", file.Filename)
@@ -223,197 +233,30 @@ func (app *App) UploadAssetBatch(ctx *gin.Context) {
 		}
 
 		mimetype := file.Header.Get("Content-Type")
-		if !slices.Contains(app.storage.allowedMimetypes, mimetype) {
+		if !slices.Contains(allowedMimetypes, mimetype) {
 			msg := fmt.Sprintf("%s: invalid file type", file.Filename)
 			handleResponse(ctx, http.StatusBadRequest, msg)
 			return
 		}
-
-		extension := filepath.Ext(file.Filename)
-		filename := createRandomFilename(userId, extension)
-		fileIds = append(fileIds, filename)
-
-		reader, err := file.Open()
-		if err != nil {
-			handleResponse(ctx, http.StatusInternalServerError, nil)
-			return
-		}
-
-		err = app.storage.UploadFile(context.TODO(), reader, filename)
-		if err != nil {
-			reader.Close()
-			handleResponse(ctx, http.StatusInternalServerError, nil)
-			return
-		}
-
-		reader.Close()
 	}
 
-	response := map[string]any{
-		"files":  fileIds,
-		"sucess": true,
-	}
-	handleResponse(ctx, http.StatusOK, response)
-}
-
-type GenerateFlashcardsData struct {
-	NumCards int      `json:"numCards" binding:"required"`
-	FilesIds []string `json:"fileIds" binding:"required"`
-}
-
-type BatchPromptTemplate struct{ NumCards int }
-
-type CombinePromptTemplate struct {
-	DeckSize int
-	Cards    []Card
-}
-
-// Parse flashcard json info from the llm response
-func extractCards(response map[string]any) ([]Card, error) {
-	choices, ok := response["choices"].([]any)
-	if !ok || len(choices) == 0 {
-		return nil, errors.New("missing or invalid choices")
-	}
-
-	choice, ok := choices[0].(map[string]any)
-	if !ok {
-		return nil, errors.New("choice[0] is not a map")
-	}
-
-	message, ok := choice["message"].(map[string]any)
-	if !ok {
-		return nil, errors.New("missing or invalid message")
-	}
-
-	content, ok := message["content"].(string)
-	if !ok {
-		return nil, errors.New("missing or invalid content string")
-	}
-
-	var contentData struct {
-		Cards []Card `json:"cards"`
-	}
-	err := json.Unmarshal([]byte(content), &contentData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse content JSON: %w", err)
-	}
-
-	return contentData.Cards, nil
-}
-
-func (app *App) createBatchPayload(
-	data GenerateFlashcardsData, userId string) (*Payload, error) {
-	templateData := BatchPromptTemplate{NumCards: data.NumCards}
-	promptContent, err := parsePromptTemplate("prompts/batch.template", templateData)
-	if err != nil {
-		return nil, err
-	}
-
-	textPrompts := []Prompt{{Type: "text", Text: promptContent}}
-
-	imagePrompts := []Prompt{}
-	for _, id := range data.FilesIds {
-		file, mimetype, err := app.storage.GetFile(context.TODO(), id)
-		if err != nil {
-			return nil, err
-		}
-
-		content, err := base64EncodeFile(file, mimetype)
-		if err != nil {
-			file.Close()
-			return nil, err
-		}
-
-		file.Close()
-
-		prompt := Prompt{
-			Type:  "image_url",
-			Image: &ImageUrl{Url: content},
-		}
-		imagePrompts = append(imagePrompts, prompt)
-	}
-
-	payload := Payload{
-		Model:  "meta-llama/llama-4-scout-17b-16e-instruct",
-		UserId: userId,
-		Messages: []Message{
-			{Role: "user", Content: imagePrompts},
-			{Role: "user", Content: textPrompts},
-		},
-		ResponseFormat: map[string]string{"type": "json_object"},
-		Temperature:    0.8,
-	}
-	return &payload, nil
-}
-
-// Use the LLM to generate a set of flashcards from a batch of files
-// Return the newly created batch of flashcards
-func (app *App) GenerateFlashcards(ctx *gin.Context) {
-	userId, err := app.getUserID(ctx)
-	if err != nil {
-		handleResponse(ctx, http.StatusBadRequest, "Authentication required")
-		return
-	}
-
-	var data GenerateFlashcardsData
-	if err := ctx.ShouldBindJSON(&data); err != nil {
-		handleResponse(ctx, http.StatusBadRequest, nil)
-		return
-	}
-
-	if len(data.FilesIds) == 0 {
-		handleResponse(ctx, http.StatusBadRequest, "No files were provided")
-		return
-	}
-
-	payload, err := app.createBatchPayload(data, userId)
+	flashcards, err := createFlashcardDrafts(app.secrets["GROQ_API_KEY"], userId, files)
 	if err != nil {
 		handleResponse(ctx, http.StatusInternalServerError, nil)
 		return
 	}
 
-	cards, err := promptGroqLLM(*payload, app.secrets["GROQ_API_KEY"], extractCards)
-	if err != nil {
-		handleResponse(ctx, http.StatusInternalServerError, nil)
-		return
-	}
-
-	response := map[string]any{"cards": cards}
+	response := map[string]any{"cards": flashcards}
 	handleResponse(ctx, http.StatusOK, response)
 }
 
 type CreateDeckData struct {
-	Name     string `json:"name" binding:"required"`
-	DeckSize int    `json:"numCards" binding:"required"`
-	Cards    []Card `json:"cards" binding:"required"`
+	Name           string `json:"name" binding:"required"`
+	DeckSize       int    `json:"size" binding:"required"`
+	FlashcardDrafs []Card `json:"drafts" binding:"required"`
 }
 
-func (app *App) createCombinePayload(
-	userId string, cards []Card, deckSize int) (*Payload, error) {
-	t := CombinePromptTemplate{DeckSize: deckSize, Cards: cards}
-	promptContent, err := parsePromptTemplate("prompts/combine.template", t)
-	if err != nil {
-		return nil, err
-	}
-
-	payload := Payload{
-		Model:  "meta-llama/llama-4-scout-17b-16e-instruct",
-		UserId: userId,
-		Messages: []Message{
-			{Role: "user", Content: []Prompt{{Type: "text", Text: promptContent}}},
-		},
-		ResponseFormat: map[string]string{"type": "json_object"},
-		Temperature:    0.8,
-	}
-	return &payload, nil
-}
-
-// Create a flashcard deck from a batch of flashcard decks. In order
-// to preserve the llm's context window, we're splitting the user's
-// asset uploads into batches and generating flashcards from said
-// batches. Once we've processed all the batches, we then combine
-// and trim the generated flashcards into a high quality set of flashcards.
-// That will be the final flashcard deck that's given to the user
+// Create a flashcard deck using previously generated flashcard drafts
 func (app *App) CreateDeck(ctx *gin.Context) {
 	userId, err := app.getUserID(ctx)
 	if err != nil {
@@ -427,15 +270,11 @@ func (app *App) CreateDeck(ctx *gin.Context) {
 		return
 	}
 
-	payload, err := app.createCombinePayload(userId, data.Cards, data.DeckSize)
+	cards, err := createFlashcardDeck(
+		app.secrets["GROQ_API_KEY"], userId, data.FlashcardDrafs, data.DeckSize,
+	)
 	if err != nil {
-		handleResponse(ctx, http.StatusInternalServerError, nil)
-		return
-	}
-
-	cards, err := promptGroqLLM(*payload, app.secrets["GROQ_API_KEY"], extractCards)
-	if err != nil {
-		handleResponse(ctx, http.StatusInternalServerError, nil)
+		handleResponse(ctx, http.StatusBadRequest, nil)
 		return
 	}
 
@@ -456,18 +295,17 @@ func main() {
 	}
 	defer app.db.Close()
 
-	if app.inDebugMode {
+	if app.inDebugMode() {
 		gin.SetMode(gin.DebugMode)
 	} else {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
 	server := gin.Default()
-	server.MaxMultipartMemory = app.maxUploadSize()
+	server.MaxMultipartMemory = app.fileUploadLimit()
 
 	server.POST("/authenticate", app.AuthenticateUser)
-	server.POST("/uploadFiles", app.UploadAssetBatch)
-	server.POST("/generateFlashcards", app.GenerateFlashcards)
+	server.POST("/upload", app.GenerateFlashcards)
 	server.POST("/createDeck", app.CreateDeck)
 	server.GET("/userInfo", app.GetUserInfo)
 	if err := server.Run(); err != nil {

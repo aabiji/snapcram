@@ -6,7 +6,8 @@ import { StyleSheet } from "react-native";
 import { Button, Input, H4, Text, Spinner, XStack, YStack } from "tamagui";
 import { Redo } from "@tamagui/lucide-icons";
 
-import { createFlashcardDeck, Deck, ImageInfo, storageGet, storageSet } from "./lib/helpers";
+import { storageGet, storageSet } from "./lib/helpers";
+import { createFlashcardDeck, Deck, ImageInfo } from "./lib/generate";
 import { Page, Header } from "./components/page";
 import ImagePicker from "./components/imagePicker";
 

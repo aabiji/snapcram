@@ -6,7 +6,8 @@ import { ChevronRight, ChevronDown, Pen, Repeat, Trash } from "@tamagui/lucide-i
 
 import { router } from "expo-router";
 
-import { storageGet, storageSet, request, Deck } from "./lib/helpers";
+import { storageGet } from "./lib/helpers";
+import { Deck } from "./lib/generate";
 import { Page, MainHeader } from "./components/page";
 
 function DeckCard({ deck, index }: { deck: Deck, index: number }) {

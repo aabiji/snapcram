@@ -6,7 +6,8 @@ import { StyleSheet } from "react-native";
 import { Button, H4, View, XStack, YStack } from "tamagui";
 import { Redo } from "@tamagui/lucide-icons";
 
-import { storageGet, storageSet, Deck } from "./lib/helpers";
+import { storageGet, storageSet } from "./lib/helpers";
+import { Deck } from "./lib/generate";
 import Flashcard from "./components/flashcard";
 import { Page, Header } from "./components/page";
 
