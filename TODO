@@ -1,8 +1,10 @@
+- Test the backend
+- Port frontend over to web (different logic depending on the platform)
+- Edit and delete decks
 - Overhaul the UI and add animations
 - Allow the user to edit their flashcards
 - A spaced repetition algorithm to deliberately shows you cards
   you're less confident about more frequently
-- Port to UI over to the web
 - Also support pdfs, word files, powerpoint slides, audio recordings, etc
 - Make the model also optionally add diagrams and images to the flashcards
 - Test the flashcard generation. Do the flashcards work for math, for other subjects, etc?

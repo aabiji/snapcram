@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"os"
 	"slices"
 	"strings"
 	"time"
@@ -15,7 +14,6 @@ import (
 
 type App struct {
 	db          Database
-	storage     CloudStorage
 	secrets     map[string]string
 	maxFileSize int64
 }
@@ -28,13 +26,8 @@ func NewApp() (App, error) {
 		return App{}, err
 	}
 
-	storage, err := NewCloudStorage(secrets)
-	if err != nil {
-		return App{}, err
-	}
-
 	maxFileSize := int64(32 << 20) // 32 megabytes
-	return App{db, storage, secrets, maxFileSize}, nil
+	return App{db, secrets, maxFileSize}, nil
 }
 
 // Each batch should hold at most 5 files
