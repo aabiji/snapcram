@@ -1,7 +1,7 @@
 # Snapcram
 
 Snapcram is a mobile app that lets you generate flashcards
-based off of pictures of your notes/
+based off of pictures of your notes.
 
 Tech stack:
 - Frontend: React native with tamagui
@@ -20,17 +20,10 @@ cd path/to/snapcram/backend
 sudo docker compose up --build
 ```
 
-When running the backend, you'll also need to create a .env in the project root that looks something like this:
+Before running the backend, you'll also need to create a .env in the project root that looks something like this:
 ```env
 DEBUG_MODE=1
-
 GROQ_API_KEY=<your api key>
-
-APP_SECRET_KEY_ID=<your backblaze secret key>
-APP_SECRET_KEY=<your backblaze secret key id>
-BUCKET_REGION=<your backblaze bucket region>
-BUCKET_NAME=<your backblaze bucket name>
-
 JWT_SECRET=<generate a secret key using this: https://jwtsecret.com/generate>
 
 PGUSER=postgres
