@@ -8,29 +8,24 @@ import { Redo } from "@tamagui/lucide-icons";
 
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
-import { Deck, storageGet, storageSet } from "./lib/helpers";
-import Flashcard from "./components/flashcard";
-import { Page, Header } from "./components/page";
+import Flashcard from "@/components/flashcard";
+import { Page, Header } from "@/components/page";
+
+import { Deck } from "@/lib/helpers";
+import useStorage from "@/lib/storage";
 
 export default function ViewDeck() {
   const routeParams = useLocalSearchParams();
   const index = Number(routeParams.index);
 
   const [deck, setDeck] = useState<Deck | undefined>(undefined);
-  const [_, setDecks] = useState<Deck[]>([]);
+  const [decks, setDecks] = useStorage("decks", []);
 
   const [cardIndex, setCardIndex] = useState(0);
   const [done, setDone] = useState(false);
   const [showFront, setShowFront] = useState(true);
 
-  const loadDeck = async () => {
-    const list = storageGet<Deck[]>("decks")!;
-    const current = list[index];
-    setDeck(current);
-    setDecks(list);
-  }
-
-  useEffect(() => { loadDeck(); }, []);
+  useEffect(() => { setDeck(decks[index]); }, []);
 
   const setConfidence = (value: number) => {
     // TODO: set the confidence for the card
@@ -40,9 +35,9 @@ export default function ViewDeck() {
     setDecks((prev: Deck[]) => {
       const copy = [...prev];
       copy[index] = deck;
-      storageSet("decks", copy);
       return copy;
     });
+
     setShowFront(true);
     if (cardIndex + 1 < deck.cards.length)
       setCardIndex(cardIndex + 1);

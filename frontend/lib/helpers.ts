@@ -1,21 +1,3 @@
-// --- Local storage
-import * as SecureStore from "expo-secure-store";
-
-export const storageSet = (key: string, value: any) =>
-  SecureStore.setItem(key, JSON.stringify(value));
-
-export const storageRemove = async (key: string) =>
-  SecureStore.deleteItemAsync(key);
-
-export function storageGet<T>(key: string): T | undefined {
-  const str = SecureStore.getItem(key);
-  return str !== null ? JSON.parse(str) as unknown as T : undefined;
-}
-
-export const removeValue = async (key: string) =>
-  SecureStore.deleteItemAsync(key);
-
-// -- HTTP
 export async function request(
   method: string,
   endpoint: string,
@@ -42,7 +24,6 @@ export async function request(
   });
 }
 
-// -- Types
 export interface Flashcard { front: string; back: string; }
 
 export interface Deck { id: number; name: string; cards: Flashcard[]; }

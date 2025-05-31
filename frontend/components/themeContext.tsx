@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState } from 'react';
 import { useColorScheme } from 'react-native';
 
-import { storageGet, storageSet } from "../lib/helpers";
+import useStorage from "@/lib/storage";
 
 interface ThemeContextType {
   theme: 'light' | 'dark';
@@ -15,19 +15,10 @@ const ThemeContext = createContext<ThemeContextType>({
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const systemTheme = useColorScheme();
-  const userTheme = storageGet<"light" | "dark">("theme", true)!;
-  const initialTheme =
-    userTheme === 'light' || userTheme === 'dark'
-      ? userTheme : systemTheme || 'light';
-  const [theme, setTheme] = useState<'light' | 'dark'>(initialTheme);
+  const [theme, setTheme] = useStorage<"light" | "dark">("theme");
+  if (theme.length == 0) setTheme(systemTheme || "light");
 
-  const toggleTheme = () => {
-    setTheme((prev) => {
-      const next = prev === 'light' ? 'dark' : 'light';
-      storageSet("theme", next);
-      return next;
-    });
-  };
+  const toggleTheme = () => setTheme(prev => prev === "light" ? "dark" : "light");
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>

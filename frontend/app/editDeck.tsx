@@ -7,28 +7,23 @@ import {
   ChevronLeft, ChevronRight, Rotate3d, Plus, Trash
 } from "@tamagui/lucide-icons";
 
-import { Deck, storageGet } from "./lib/helpers";
-import Flashcard from "./components/flashcard";
-import { Page, Header } from "./components/page";
+import { Deck } from "@/lib/helpers";
+import useStorage from "@/lib/storage";
+
+import Flashcard from "@/components/flashcard";
+import { Page, Header } from "@/components/page";
 
 export default function ViewDeck() {
   const routeParams = useLocalSearchParams();
   const index = Number(routeParams.index);
 
   const [deck, setDeck] = useState<Deck | undefined>(undefined);
-  const [_, setDecks] = useState<Deck[]>([]);
+  const [decks, _] = useStorage("decks", []);
 
   const [cardIndex, setCardIndex] = useState(0);
   const [showFront, setShowFront] = useState(true);
 
-  const loadDeck = async () => {
-    const list = storageGet<Deck[]>("decks")!;
-    const current = list[index];
-    setDeck(current);
-    setDecks(list);
-  }
-
-  useEffect(() => { loadDeck(); }, []);
+  useEffect(() => { setDeck(decks[index]); }, []);
 
   // mod handles negative values as well
   const mod = (n: number, m: number) => ((n % m) + m) % m;

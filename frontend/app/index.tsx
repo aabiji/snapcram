@@ -1,13 +1,14 @@
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { Pressable } from "react-native";
 
 import { Button, Card, H4, Text, XStack, YStack } from "tamagui";
 import { ChevronRight, ChevronDown, Pen, Repeat, Trash } from "@tamagui/lucide-icons";
 
-import { router, useFocusEffect } from "expo-router";
+import { router } from "expo-router";
 
-import { Deck, request, storageGet, storageSet  } from "./lib/helpers";
-import { Page, MainHeader } from "./components/page";
+import useStorage from "@/lib/storage";
+import { Deck, request } from "@/lib/helpers";
+import { Page, MainHeader } from "@/components/page";
 
 function DeckCard(
   { deck, index, deleteSelf }: {
@@ -59,21 +60,12 @@ function DeckCard(
 }
 
 export default function Index() {
-  // Update user data when the page loads
-  const [decks, setDecks] = useState<Deck[]>([]);
-  useFocusEffect(
-    useCallback(() => {
-      const stored = storageGet<Deck[]>("decks") ?? [];
-      setDecks(stored);
-    }, [])
-  );
+  const [decks, setDecks] = useStorage("decks", []);
+  const [token, _] = useStorage("jwt", []);
 
   const deleteDeck = async (index: number) => {
-    const token = storageGet<string>("jwt")!;
-    const deck = decks[index];
-
     try {
-      const response = await request("DELETE", "/deck", {id: deck.id}, token);
+      const response = await request("DELETE", "/deck", {id: decks[index].id}, token);
       const json = await response.json();
       if (response.status != 200) {
         console.log("TODO: show user that something went wrong!", json);
@@ -84,10 +76,9 @@ export default function Index() {
       return;
     }
 
-    setDecks((prev) => {
+    setDecks((prev: Deck[]) => {
       let copy = [...prev];
       copy.splice(index, 1);
-      storageSet("decks", copy);
       return copy;
     });
   };

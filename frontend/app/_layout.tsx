@@ -5,17 +5,19 @@ import { useEffect, useState } from "react";
 import { Spinner, TamaguiProvider, View } from "tamagui";
 import tamaguiConfig from "@/tamagui.config";
 
-import { ThemeProvider, useThemeContext } from "./components/themeContext";
-import { request, storageGet, storageSet  } from "./lib/helpers";
+import { request } from "@/lib/helpers";
+import useStorage from "@/lib/storage";
+import { ThemeProvider, useThemeContext } from "@/components/themeContext";
 
 function LayoutContent() {
   const  { theme } = useThemeContext();
 
   const [defaultRoute, setDefaultRoute] = useState<string | undefined>(undefined);
+  const [token, _] = useStorage("jwt", "");
+  const [_, setDecks] = useStorage("decks", "");
 
   const loadUserInfo = async () => {
     // User hasn't authenticated before
-    const token = storageGet<string>("jwt");
     if (token === undefined || token.length == 0) {
       setDefaultRoute("auth");
       return;
@@ -30,7 +32,7 @@ function LayoutContent() {
         return;
       }
 
-      storageSet("decks", json["decks"]);
+      setDecks(json["decks"]);
       setDefaultRoute("index");
     } catch (error) {
       setDefaultRoute("networkIssue");

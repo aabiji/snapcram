@@ -6,8 +6,8 @@ import {
 } from "tamagui";
 import { Moon, Sun, X } from "@tamagui/lucide-icons";
 
-import { Page, Header } from "./components/page";
-import useThemeContext from "./components/themeContext";
+import { Page, Header } from "@/components/page";
+import useThemeContext from "@/components/themeContext";
 
 function ConfirmAccountDeletion({ deleteAccount }: { deleteAccount: () => void; }) {
   return (

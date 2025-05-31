@@ -5,8 +5,10 @@ import { useState } from "react";
 import { Anchor, Button, Card, H2, Input, Spinner, Text, View } from "tamagui";
 import { Eye, EyeOff } from "@tamagui/lucide-icons";
 
-import Page from "./components/page";
-import { request, storageSet } from "./lib/helpers";
+import Page from "@/components/page";
+
+import { request } from "@/lib/helpers";
+import useStorage from "@/lib/storage";
 
 function PasswordInput({ setPassword, placeholder }) {
   const [visible, setVisible] = useState(false);
@@ -35,6 +37,8 @@ export default function AuthPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [creatingAccount, setCreatingAccount] = useState(false);
+
+  const [_, setToken] = useStorage("jwt", "");
 
   const validateInputs = (): boolean => {
     const base = email.length > 0 && password.length > 0
@@ -89,7 +93,7 @@ export default function AuthPage() {
       const json = await response.json();
 
       if (response.status == 200) {
-        storageSet("jwt", json["token"]);
+        setToken(json["token"]);
         router.navigate("/");
       } else if (response.status == 406) {
         // signal a user error

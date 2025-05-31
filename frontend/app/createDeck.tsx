@@ -1,17 +1,16 @@
 import { router } from "expo-router";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { StyleSheet } from "react-native";
 
 import { Button, Input, H4, Text, Spinner, XStack, YStack } from "tamagui";
 import { Redo } from "@tamagui/lucide-icons";
 
-import {
-  storageGet, storageSet, request,
-  Asset, Deck, Flashcard
-} from "./lib/helpers";
-import { Page, Header } from "./components/page";
-import ImagePicker from "./components/imagePicker";
+import useStorage from "@/lib/storage";
+import { request, Asset, Deck, Flashcard } from "@/lib/helpers";
+
+import { Page, Header } from "@/components/page";
+import ImagePicker from "@/components/imagePicker";
 
 enum States { None, Generating, Error };
 
@@ -22,7 +21,9 @@ export default function CreateDeck() {
 
   const [errorMessage, setErrorMessage] = useState("");
   const [state, setState] = useState(States.None);
-  const [jwt, setJwt] = useState<string>("");
+
+  const [token, _] = useStorage("jwt", "");
+  const [decks, setDecks] = useStorage("decks", []);
 
   const updateNumCards = (text: string) => {
     const num = Math.round(Number(text));
@@ -35,8 +36,7 @@ export default function CreateDeck() {
       return false;
     }
 
-    const decks = storageGet<Deck[]>("decks") ?? [];
-    const same = decks.find(deck => deck.name == name);
+    const same = decks.find((deck: Deck) => deck.name == name);
     if (same !== undefined) {
         setErrorMessage("Deck already exists");
         return false;
@@ -64,7 +64,7 @@ export default function CreateDeck() {
       });
     }
 
-    const response = await request("POST", "/generate", formData, jwt);
+    const response = await request("POST", "/generate", formData, token);
     const json = await response.json();
     if (response.status == 200)
       return json["cards"];
@@ -92,9 +92,9 @@ export default function CreateDeck() {
       const response = await request("PUT", "/deck", payload, jwt);
       const json = await response.json();
 
-      const list = storageGet<Deck[]>("decks") ?? [];
-      storageSet("decks", [...list, json]);
-      router.push({pathname: "/viewDeck", params: {index: list.length}})
+      const len = decks.length;
+      setDecks((prev: Deck[]) => [...prev, json]);
+      router.push({pathname: "/viewDeck", params: {index: len}})
     } catch (error) {
       console.log(error);
       setState(States.Error);
@@ -102,11 +102,6 @@ export default function CreateDeck() {
 
     setState(States.None);
   }
-
-  useEffect(() => {
-      const token = storageGet<string>("jwt")!;
-      setJwt(token);
-  }, []);
 
   return (
     <Page header={<Header title="Create deck" />}>
