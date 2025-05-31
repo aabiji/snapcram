@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -14,6 +15,7 @@ type Card struct {
 }
 
 type Deck struct {
+	ID    int    `json:"id"`
 	Name  string `json:"name"`
 	Cards []Card `json:"cards"`
 }
@@ -97,10 +99,32 @@ func (db *Database) validateUserCredentials(email, password string) (string, err
 	return userId, nil
 }
 
-func (db *Database) insertDeck(userId string, deck Deck) error {
+func (db *Database) deleteDeck(userId string, deckId int) error {
 	tx, err := db.pool.Begin(context.Background())
 	if err != nil {
 		return err
+	}
+	defer tx.Rollback(context.Background())
+
+	str := "delete from Flashcards where DeckID = $1"
+	_, err = tx.Exec(context.Background(), str, deckId)
+	if err != nil {
+		return err
+	}
+
+	str = "delete from Decks where UserID = $1 and ID = $2"
+	_, err = tx.Exec(context.Background(), str, userId, deckId)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit(context.Background())
+}
+
+func (db *Database) insertDeck(userId string, deck Deck) (int, error) {
+	tx, err := db.pool.Begin(context.Background())
+	if err != nil {
+		return -1, err
 	}
 	defer tx.Rollback(context.Background())
 
@@ -108,19 +132,19 @@ func (db *Database) insertDeck(userId string, deck Deck) error {
 	str := "insert into Decks (UserId, Name) values ($1, $2) returning ID;"
 	err = tx.QueryRow(context.Background(), str, userId, deck.Name).Scan(&deckId)
 	if err != nil {
-		return err
+		return -1, err
 	}
 
 	for _, card := range deck.Cards {
 		str := "insert into Flashcards (DeckId, Front, Back) values ($1, $2, $3);"
 		_, err = tx.Exec(context.Background(), str, deckId, card.Front, card.Back)
 		if err != nil {
-			return err
+			return -1, err
 		}
 	}
 
 	err = tx.Commit(context.Background())
-	return err
+	return deckId, err
 }
 
 func (db *Database) getFlashcards(deckId string) ([]Card, error) {
@@ -163,7 +187,12 @@ func (db *Database) getDecks(userId string) ([]Deck, error) {
 			return nil, err
 		}
 
-		decks = append(decks, Deck{Name: deckName, Cards: cards})
+		id, err := strconv.Atoi(deckId)
+		if err != nil {
+			return nil, err
+		}
+
+		decks = append(decks, Deck{ID: id, Name: deckName, Cards: cards})
 	}
 
 	return decks, nil

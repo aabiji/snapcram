@@ -45,6 +45,6 @@ export async function request(
 // -- Types
 export interface Flashcard { front: string; back: string; }
 
-export interface Deck { name: string; cards: Flashcard[]; }
+export interface Deck { id: number; name: string; cards: Flashcard[]; }
 
 export interface Asset { uri: string; name: string; mimetype: string; }

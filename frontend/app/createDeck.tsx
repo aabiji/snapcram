@@ -89,7 +89,7 @@ export default function CreateDeck() {
       }
 
       const payload = { name, size: numCards, drafts: cards };
-      const response = await request("POST", "/createDeck", payload, jwt);
+      const response = await request("PUT", "/deck", payload, jwt);
       const json = await response.json();
 
       const list = storageGet<Deck[]>("decks") ?? [];

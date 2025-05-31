@@ -246,7 +246,6 @@ func (app *App) CreateDeck(ctx *gin.Context) {
 
 	var data CreateDeckData
 	if err := ctx.ShouldBindJSON(&data); err != nil {
-		fmt.Println("wrong payload")
 		handleResponse(ctx, http.StatusBadRequest, nil)
 		return
 	}
@@ -260,14 +259,40 @@ func (app *App) CreateDeck(ctx *gin.Context) {
 		return
 	}
 
-	err = app.db.insertDeck(userId, Deck{Name: data.Name, Cards: cards})
+	id, err := app.db.insertDeck(userId, Deck{Name: data.Name, Cards: cards})
 	if err != nil {
 		handleResponse(ctx, http.StatusInternalServerError, nil)
 		return
 	}
 
-	response := map[string]any{"name": data.Name, "cards": cards}
+	response := map[string]any{"name": data.Name, "cards": cards, "id": id}
 	handleResponse(ctx, http.StatusOK, response)
+}
+
+type DeleteDeckData struct {
+	ID int `json:"id" binding:"required"`
+}
+
+func (app *App) DeleteDeck(ctx *gin.Context) {
+	userId, err := app.getUserID(ctx)
+	if err != nil {
+		handleResponse(ctx, http.StatusBadRequest, "Authentication required")
+		return
+	}
+
+	var data DeleteDeckData
+	if err := ctx.ShouldBindJSON(&data); err != nil {
+		handleResponse(ctx, http.StatusBadRequest, nil)
+		return
+	}
+
+	err = app.db.deleteDeck(userId, data.ID)
+	if err != nil {
+		handleResponse(ctx, http.StatusInternalServerError, nil)
+		return
+	}
+
+	handleResponse(ctx, http.StatusOK, nil)
 }
 
 func main() {
@@ -286,10 +311,12 @@ func main() {
 	server := gin.Default()
 	server.MaxMultipartMemory = app.fileUploadLimit()
 
+	server.GET("/userInfo", app.GetUserInfo)
 	server.POST("/authenticate", app.AuthenticateUser)
 	server.POST("/generate", app.GenerateFlashcards)
-	server.POST("/createDeck", app.CreateDeck)
-	server.GET("/userInfo", app.GetUserInfo)
+	server.PUT("/deck", app.CreateDeck)
+	server.DELETE("/deck", app.DeleteDeck)
+
 	if err := server.Run(); err != nil {
 		panic(err)
 	}

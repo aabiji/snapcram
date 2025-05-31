@@ -6,10 +6,13 @@ import { ChevronRight, ChevronDown, Pen, Repeat, Trash } from "@tamagui/lucide-i
 
 import { router, useFocusEffect } from "expo-router";
 
-import { Deck, storageGet } from "./lib/helpers";
+import { Deck, request, storageGet, storageSet  } from "./lib/helpers";
 import { Page, MainHeader } from "./components/page";
 
-function DeckCard({ deck, index }: { deck: Deck, index: number }) {
+function DeckCard(
+  { deck, index, deleteSelf }: {
+    deck: Deck, index: number, deleteSelf: () => void;
+}) {
   const [showControls, setShowControls] = useState(false);
 
   return (
@@ -26,8 +29,15 @@ function DeckCard({ deck, index }: { deck: Deck, index: number }) {
 
         {showControls &&
           <XStack justifyContent="space-between" width="100%">
-            <Button padding={0} transparent color="red" icon={<Trash />}>Delete</Button>
-            <Button padding={0} transparent color="green" icon={<Pen />}>Edit</Button>
+            <Button
+              padding={0} transparent color="red" icon={<Trash />}
+              onPress={deleteSelf}
+            >
+              Delete
+            </Button>
+            <Button padding={0} transparent color="green" icon={<Pen />}>
+              Edit
+            </Button>
             <Button
               color="purple" icon={<Repeat />} transparent padding={0}
               onPress={() =>
@@ -52,6 +62,30 @@ export default function Index() {
     }, [])
   );
 
+  const deleteDeck = async (index: number) => {
+    const token = storageGet<string>("jwt")!;
+    const deck = decks[index];
+
+    try {
+      const response = await request("DELETE", "/deck", {id: deck.id}, token);
+      const json = await response.json();
+      if (response.status != 200) {
+        console.log("TODO: show user that something went wrong!", json);
+        return;
+      }
+    } catch (error) {
+      console.log("TODO: show user that something went wrong!", error);
+      return;
+    }
+
+    setDecks((prev) => {
+      let copy = [...prev];
+      copy.splice(index, 1);
+      storageSet("decks", copy);
+      return copy;
+    });
+  };
+
   return (
     <Page header={<MainHeader />}>
       <YStack gap={25} paddingTop={20} flex={1}>
@@ -68,7 +102,10 @@ export default function Index() {
         }
 
         {decks.map((item, index) => (
-          <DeckCard deck={item} index={index}  key={index} />
+          <DeckCard
+            deck={item} index={index} key={index}
+            deleteSelf={() => deleteDeck(index)}
+          />
         ))}
       </YStack>
     </Page>
