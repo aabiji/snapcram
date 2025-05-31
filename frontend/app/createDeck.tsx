@@ -64,7 +64,7 @@ export default function CreateDeck() {
       });
     }
 
-    const response = await request("POST", "/upload", formData, jwt);
+    const response = await request("POST", "/generate", formData, jwt);
     const json = await response.json();
     if (response.status == 200)
       return json["cards"];
@@ -79,7 +79,7 @@ export default function CreateDeck() {
 
     try {
       const batchSize = 5;
-      const numBatches = Math.floor(images.length / batchSize);
+      const numBatches = Math.ceil(images.length / batchSize);
       let cards = [];
 
       for (let i = 0; i < numBatches; i++) {
@@ -88,7 +88,7 @@ export default function CreateDeck() {
         cards.push(...set);
       }
 
-      const payload = { name, deckSize: numCards, cards };
+      const payload = { name, size: numCards, drafts: cards };
       const response = await request("POST", "/createDeck", payload, jwt);
       const json = await response.json();
 
@@ -99,6 +99,8 @@ export default function CreateDeck() {
       console.log(error);
       setState(States.Error);
     }
+
+    setState(States.None);
   }
 
   useEffect(() => {

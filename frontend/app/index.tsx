@@ -1,13 +1,12 @@
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { Pressable } from "react-native";
 
 import { Button, Card, H4, Text, XStack, YStack } from "tamagui";
 import { ChevronRight, ChevronDown, Pen, Repeat, Trash } from "@tamagui/lucide-icons";
 
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 
-import { storageGet } from "./lib/helpers";
-import { Deck } from "./lib/generate";
+import { Deck, storageGet } from "./lib/helpers";
 import { Page, MainHeader } from "./components/page";
 
 function DeckCard({ deck, index }: { deck: Deck, index: number }) {
@@ -44,12 +43,14 @@ function DeckCard({ deck, index }: { deck: Deck, index: number }) {
 }
 
 export default function Index() {
+  // Update user data when the page loads
   const [decks, setDecks] = useState<Deck[]>([]);
-
-  useEffect(() => {
-    const stored = storageGet<Deck[]>("decks") ?? [];
-    setDecks(stored);
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      const stored = storageGet<Deck[]>("decks") ?? [];
+      setDecks(stored);
+    }, [])
+  );
 
   return (
     <Page header={<MainHeader />}>

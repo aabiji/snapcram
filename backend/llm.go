@@ -56,6 +56,8 @@ func promptGroqLLM(payload Payload, apiKey string) (map[string]any, error) {
 	}
 	defer response.Body.Close()
 
+	fmt.Println(response.StatusCode)
+
 	responseBytes, err := io.ReadAll(response.Body)
 	if err != nil {
 		return nil, err

@@ -246,6 +246,7 @@ func (app *App) CreateDeck(ctx *gin.Context) {
 
 	var data CreateDeckData
 	if err := ctx.ShouldBindJSON(&data); err != nil {
+		fmt.Println("wrong payload")
 		handleResponse(ctx, http.StatusBadRequest, nil)
 		return
 	}
@@ -254,7 +255,8 @@ func (app *App) CreateDeck(ctx *gin.Context) {
 		app.secrets["GROQ_API_KEY"], userId, data.FlashcardDrafs, data.DeckSize,
 	)
 	if err != nil {
-		handleResponse(ctx, http.StatusBadRequest, nil)
+		fmt.Println(err)
+		handleResponse(ctx, http.StatusInternalServerError, nil)
 		return
 	}
 
@@ -285,7 +287,7 @@ func main() {
 	server.MaxMultipartMemory = app.fileUploadLimit()
 
 	server.POST("/authenticate", app.AuthenticateUser)
-	server.POST("/upload", app.GenerateFlashcards)
+	server.POST("/generate", app.GenerateFlashcards)
 	server.POST("/createDeck", app.CreateDeck)
 	server.GET("/userInfo", app.GetUserInfo)
 	if err := server.Run(); err != nil {

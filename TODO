@@ -1,5 +1,6 @@
-- Test the backend
 - Port frontend over to web (different logic depending on the platform)
+- Use react-mmkv-storage for localstorage instead. Think of a smarter way to store decks on the user's side
+- Install android studio and build a dev apk
 - Edit and delete decks
 - Overhaul the UI and add animations
 - Allow the user to edit their flashcards

@@ -13,7 +13,7 @@ You are given a list of flashcards in the following JSON format:
 Input flashcards:
 {{.Cards}}
 
-Your task is to produce a refined set of exactly {{.NumCards}} high-quality flashcards. To do this:
+Your task is to produce a refined set of exactly {{.DeckSize}} high-quality flashcards. To do this:
 
 - Analyze the given cards to identify high-value content.
 - Select the most meaningful, information-rich, or representative cards.
