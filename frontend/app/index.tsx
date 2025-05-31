@@ -21,10 +21,12 @@ function DeckCard(
         <XStack justifyContent="space-between" width="100%">
           <YStack>
             <Text fontWeight="bold">{deck.name}</Text>
-            <Text>80% confident</Text>
+            <Text>confidence percentage</Text>
           </YStack>
-          {showControls && <ChevronDown scale={1.25} onPress={() => setShowControls(false)} />}
-          {!showControls && <ChevronRight scale={1.25} onPress={() => setShowControls(true)} />}
+          {showControls &&
+            <ChevronDown scale={1.25} onPress={() => setShowControls(false)} />}
+          {!showControls &&
+            <ChevronRight scale={1.25} onPress={() => setShowControls(true)} />}
         </XStack>
 
         {showControls &&
@@ -35,7 +37,11 @@ function DeckCard(
             >
               Delete
             </Button>
-            <Button padding={0} transparent color="green" icon={<Pen />}>
+            <Button
+              padding={0} transparent color="green" icon={<Pen />}
+              onPress={() =>
+                router.push({ pathname: "/editDeck", params: { index } })
+              }>
               Edit
             </Button>
             <Button

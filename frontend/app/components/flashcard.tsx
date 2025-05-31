@@ -6,8 +6,8 @@ interface FlashcardProps {
   frontContent: React.ReactNode;
   backContent: React.ReactNode;
 
-  showFront: boolean;
-  setShowFront: React.Dispatch<React.SetStateAction<boolean>>;
+  showFront?: boolean;
+  setShowFront?: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 // A component that flips front to back then back to front when clicked
@@ -51,16 +51,21 @@ export default function Flashcard(
     position: "absolute", top: 0, left: 0, right: 0, bottom: 0
   };
 
+  const show = (front: boolean | undefined) => {
+    if (front !== undefined)
+      setShowFront!(!front);
+  };
+
   return (
     <View style={styles.cardContainer}>
       <Animated.View style={[styles.flashcard, frontAnimatedStyle]}>
-        <Card style={styles.card} bordered onPress={() => setShowFront(!showFront)}>
+        <Card style={styles.card} bordered onPress={() => show(!showFront)}>
           {frontContent}
         </Card>
       </Animated.View>
 
       <Animated.View style={[styles.flashcard, backAnimatedStyle]}>
-        <Card style={styles.card} bordered onPress={() => setShowFront(!showFront)}>
+        <Card style={styles.card} bordered onPress={() => show(!showFront)}>
           {backContent}
         </Card>
       </Animated.View>

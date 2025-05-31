@@ -1,19 +1,21 @@
-- Port frontend over to web (different logic depending on the platform)
-- Use react-mmkv-storage for localstorage instead. Think of a smarter way to store decks on the user's side
+- Implement card editing (flashcard flipping doesn't work anymore when practicing)
+- Put a random message in the homescreen
 - Install android studio and build a dev apk
-- Edit and delete decks
-- Overhaul the UI and add animations
-- Allow the user to edit their flashcards
+- Use react-mmkv-storage for localstorage instead. Think of a smarter way to store decks on the user's side
+- Port frontend over to web (different logic depending on the platform)
+- Improve theme: going for a solarized vibe that's easy on the eyes and nice to stare at
+- Improve fonts: going for a calm yet playful vibe (headers should bolded, btw)
+- Improcw the styling of the auth page
+- Design logo and art
 - A spaced repetition algorithm to deliberately shows you cards
   you're less confident about more frequently
 - Also support pdfs, word files, powerpoint slides, audio recordings, etc
 - Make the model also optionally add diagrams and images to the flashcards
-- Test the flashcard generation. Do the flashcards work for math, for other subjects, etc?
+- Do the flashcards work for math, for other subjects, etc?
 - Be able to export the flashcards to anki
 - Host the backend (and website) and publish to the play store
 - Find and load existing flashcard decks (not necessarily ai generated)
 - Extend the idea further and generate mock tests
-- Design logo and art
 - Add logging to the backend
 
 - https://www.namecheap.com/domains/domain-name-search/

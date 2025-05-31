@@ -6,8 +6,9 @@ import { StyleSheet } from "react-native";
 import { Button, H4, View, XStack, YStack } from "tamagui";
 import { Redo } from "@tamagui/lucide-icons";
 
-import { storageGet, storageSet } from "./lib/helpers";
-import { Deck } from "./lib/generate";
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+
+import { Deck, storageGet, storageSet } from "./lib/helpers";
 import Flashcard from "./components/flashcard";
 import { Page, Header } from "./components/page";
 
@@ -84,12 +85,21 @@ export default function ViewDeck() {
 
             <XStack style={styles.controls}>
               <Button flex={1} borderRadius={0} backgroundColor="red"
-                onPress={() => setConfidence(0)}>😔</Button>
+                onPress={() => setConfidence(0)}>
+                <MaterialCommunityIcons
+                  name="emoticon-sad-outline" size={32} color="white" />
+              </Button>
               <Button flex={1} borderRadius={0} backgroundColor="orange"
-                onPress={() => setConfidence(0.5)}>😐</Button>
+                onPress={() => setConfidence(0.5)}>
+                <MaterialCommunityIcons
+                  name="emoticon-neutral-outline" size={32} color="white" />
+              </Button>
               <Button
                 flex={1} borderRadius={0} backgroundColor="green"
-                onPress={() => setConfidence(1)}>😊</Button>
+                onPress={() => setConfidence(1)}>
+                <MaterialCommunityIcons
+                  name="emoticon-happy-outline" size={32} color="white" />
+              </Button>
             </XStack>
           </View>
         }

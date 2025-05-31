@@ -55,6 +55,7 @@ function LayoutContent() {
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="networkIssue" options={{ headerShown: false }} />
         <Stack.Screen name="viewDeck" options={{ headerShown: false }} />
+        <Stack.Screen name="editDeck" options={{ headerShown: false }} />
         <Stack.Screen name="createDeck" options={{ headerShown: false }} />
         <Stack.Screen name="settings" options={{ headerShown: false }} />
         <Stack.Screen name="auth" options={{ headerShown: false }} />
