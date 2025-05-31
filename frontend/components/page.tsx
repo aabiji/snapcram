@@ -11,7 +11,7 @@ import { ChevronLeft, Plus, Settings } from "@tamagui/lucide-icons";
 export function MainHeader() {
   return (
     <XStack justifyContent="space-between">
-      <H3>Time to study!</H3>
+      <H3>Your decks</H3>
       <XStack>
         <Button
           onPress={() => router.push("/createDeck")}

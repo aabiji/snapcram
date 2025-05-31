@@ -13,8 +13,8 @@ function LayoutContent() {
   const  { theme } = useThemeContext();
 
   const [defaultRoute, setDefaultRoute] = useState<string | undefined>(undefined);
-  const [token, _] = useStorage("jwt", "");
-  const [_, setDecks] = useStorage("decks", "");
+  const [token, _setToken] = useStorage("jwt", "");
+  const [_decks, setDecks] = useStorage("decks", "");
 
   const loadUserInfo = async () => {
     // User hasn't authenticated before

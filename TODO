@@ -1,7 +1,6 @@
 - Implement card editing (flashcard flipping doesn't work anymore when practicing)
 - Put a random message in the homescreen
 - Install android studio and build a dev apk
-- Use react-mmkv-storage for localstorage instead. Think of a smarter way to store decks on the user's side
 - Port frontend over to web (different logic depending on the platform)
 - Improve theme: going for a solarized vibe that's easy on the eyes and nice to stare at
 - Improve fonts: going for a calm yet playful vibe (headers should bolded, btw)
