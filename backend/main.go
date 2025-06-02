@@ -30,8 +30,8 @@ func NewApp() (App, error) {
 	return App{db, secrets, maxFileSize}, nil
 }
 
-// Each batch should hold at most 5 files
-func (app *App) fileUploadLimit() int64 { return app.maxFileSize * 5 }
+// Each batch should hold at most 2 files
+func (app *App) fileUploadLimit() int64 { return app.maxFileSize * 2 }
 
 func (app *App) inDebugMode() bool {
 	debugVar := app.secrets["DEBUG_MODE"]
@@ -254,7 +254,6 @@ func (app *App) CreateDeck(ctx *gin.Context) {
 		app.secrets["GROQ_API_KEY"], userId, data.FlashcardDrafs, data.DeckSize,
 	)
 	if err != nil {
-		fmt.Println(err)
 		handleResponse(ctx, http.StatusInternalServerError, nil)
 		return
 	}

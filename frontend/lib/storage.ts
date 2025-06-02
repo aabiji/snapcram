@@ -5,6 +5,11 @@ const storageInstance = new MMKVLoader()
     .setProcessingMode(ProcessingModes.SINGLE_PROCESS)
     .initialize();
 
-export const useStorage = (key: any, defaultValue: any) =>
-    useMMKVStorage(key, storageInstance, defaultValue);
+export function useStorage<T>(key: string, defaultValue: T) {
+    return useMMKVStorage<T>(key, storageInstance, defaultValue);
+}
+
+export const storeObject = async (key: string, value: any) =>
+    await storageInstance.setMapAsync(key, value);
+
 export default useStorage;

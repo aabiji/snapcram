@@ -1,108 +1,78 @@
-import { useState } from "react";
-import { Pressable } from "react-native";
+import { useFocusEffect, router } from "expo-router";
 
-import { Button, Card, H4, Text, XStack, YStack } from "tamagui";
-import { ChevronRight, ChevronDown, Pen, Repeat, Trash } from "@tamagui/lucide-icons";
+import { useCallback, useState } from "react";
 
-import { router } from "expo-router";
+import { H4, Spinner, YStack } from "tamagui";
 
-import useStorage from "@/lib/storage";
+import { storeObject, useStorage } from "@/lib/storage";
 import { Deck, request } from "@/lib/helpers";
+
 import { Page, MainHeader } from "@/components/page";
-
-function DeckCard(
-  { deck, index, deleteSelf }: {
-    deck: Deck, index: number, deleteSelf: () => void;
-}) {
-  const [showControls, setShowControls] = useState(false);
-
-  return (
-    <Pressable>
-      <Card width="100%" padding={15} bordered>
-        <XStack justifyContent="space-between" width="100%">
-          <YStack>
-            <Text fontWeight="bold">{deck.name}</Text>
-            <Text>confidence percentage</Text>
-          </YStack>
-          {showControls &&
-            <ChevronDown scale={1.25} onPress={() => setShowControls(false)} />}
-          {!showControls &&
-            <ChevronRight scale={1.25} onPress={() => setShowControls(true)} />}
-        </XStack>
-
-        {showControls &&
-          <XStack justifyContent="space-between" width="100%">
-            <Button
-              padding={0} transparent color="red" icon={<Trash />}
-              onPress={deleteSelf}
-            >
-              Delete
-            </Button>
-            <Button
-              padding={0} transparent color="green" icon={<Pen />}
-              onPress={() =>
-                router.push({ pathname: "/editDeck", params: { index } })
-              }>
-              Edit
-            </Button>
-            <Button
-              color="purple" icon={<Repeat />} transparent padding={0}
-              onPress={() =>
-                router.push({ pathname: "/viewDeck", params: { index } })
-            }>
-              Practice
-            </Button>
-          </XStack>
-        }
-      </Card>
-    </Pressable>
-  );
-}
+import DeckCard from "@/components/deckCard";
 
 export default function Index() {
-  const [decks, setDecks] = useStorage("decks", []);
-  const [token, _] = useStorage("jwt", []);
+  const [decks, setDecks] = useStorage<string[]>("decks", []);
+  const [token, _setToken] = useStorage<string>("jwt", "");
+  const [loading, setLoading] = useState<boolean>(true);
 
-  const deleteDeck = async (index: number) => {
-    try {
-      const response = await request("DELETE", "/deck", {id: decks[index].id}, token);
-      const json = await response.json();
-      if (response.status != 200) {
-        console.log("TODO: show user that something went wrong!", json);
-        return;
-      }
-    } catch (error) {
-      console.log("TODO: show user that something went wrong!", error);
+  const loadUserInfo = async () => {
+    // User hasn't authenticated before
+    if (token === undefined || token.length == 0) {
+      router.replace("/auth");
+      setLoading(false);
       return;
     }
 
-    setDecks((prev: Deck[]) => {
-      let copy = [...prev];
-      copy.splice(index, 1);
-      return copy;
-    });
-  };
+    try {
+      const response = await request("GET", "/userInfo", undefined, token);
+      const json = await response.json();
+
+      if (response.status != 200 || json["tokenExpired"] == true) {
+        router.replace("/auth");
+        setLoading(false);
+        return;
+      }
+
+      // Store all the user's decks
+      const names = [];
+      for (let i = 0; i < json["decks"].length; i++) {
+        const deck: Deck = json["decks"][i];
+        await storeObject(deck.name, deck);
+        names.push(deck.name);
+      }
+      setDecks(names);
+
+      setLoading(false);
+    } catch (error) {
+      console.log(error);
+      router.replace("/networkIssue");
+      setLoading(false);
+    }
+  }
+
+  useFocusEffect(useCallback(() => { loadUserInfo(); }, []));
+
+  if (loading) {
+    return (
+      <YStack flex={1} justifyContent="center" alignItems="center">
+        <Spinner size="large" />
+      </YStack>
+    );
+  }
 
   return (
     <Page header={<MainHeader />}>
       <YStack gap={25} paddingTop={20} flex={1}>
         {decks.length == 0 &&
           <YStack flex={1} justifyContent="center">
-            <H4
-              textAlign="center"
-              color="dimgrey"
-              alignSelf="center"
-            >
-              Create a new flashcard deck to get started
+            <H4 textAlign="center" color="dimgrey" alignSelf="center">
+              Create your first deck
             </H4>
           </YStack>
         }
 
-        {decks.map((item, index) => (
-          <DeckCard
-            deck={item} index={index} key={index}
-            deleteSelf={() => deleteDeck(index)}
-          />
+        {decks.map((item: string, index: number) => (
+          <DeckCard name={item} index={index} key={index} />
         ))}
       </YStack>
     </Page>

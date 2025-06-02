@@ -1,4 +1,4 @@
-import * as ImagePicker from "expo-image-picker";
+import * as DocumentPicker from 'expo-document-picker';
 
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet } from "react-native";
@@ -6,11 +6,13 @@ import { Pressable, ScrollView, StyleSheet } from "react-native";
 import { Button, Image, Text, XStack, YStack } from "tamagui";
 import { Plus, Trash } from "@tamagui/lucide-icons";
 
-export default function ImageGrid({ images, setImages }) {
-  const [selectedImages, setSelectedImages] = useState<number[]>([]);
+import { Asset } from "@/lib/helpers";
 
-  const toggleImageSelection = (index: number) => {
-    setSelectedImages(prev => {
+export default function FilePicker({ files, setFiles }) {
+  const [selectedFiles, setSelectedFiles] = useState<number[]>([]);
+
+  const toggleFileSelection = (index: number) => {
+    setSelectedFiles(prev => {
       const copy = [...prev];
       if (copy.includes(index))
         copy.splice(copy.indexOf(index), 1);
@@ -20,41 +22,40 @@ export default function ImageGrid({ images, setImages }) {
     });
   }
 
-  const removeSelectedImages = () => {
-    setImages(prev => {
+  const removeSelectedFiles = () => {
+    setFiles(prev => {
       let arr = [];
       for (let i = 0; i < prev.length; i++) {
-        if (!selectedImages.includes(i))
-          arr.push(images[i]);
+        if (!selectedFiles.includes(i))
+          arr.push(files[i]);
       }
-      setSelectedImages([]);
+      setSelectedFiles([]);
       return arr;
     });
   }
 
-  const pickImages = async () => {
-    const opts: ImagePicker.ImagePickerOptions = { mediaTypes: ["images"] };
-    const result = await ImagePicker.launchImageLibraryAsync(opts);
+  const pickFiles = async () => {
+    const result = await DocumentPicker.getDocumentAsync({ type: ["image/*"] });
     if (result.canceled) return;
 
     const selection = result.assets
-      .filter(asset => asset.uri && asset.mimeType && asset.fileName)
+      .filter(asset => asset.uri && asset.mimeType && asset.name)
       .map(asset => ({
-        uri: asset.uri!, mimetype: asset.mimeType!, name: asset.fileName!
+        uri: asset.uri!, mimetype: asset.mimeType!, name: asset.name!
       }));
 
-    setImages(prev => {
+    setFiles(prev => {
       let arr = [...prev];
-      for (const image of selection) {
+      for (const file of selection) {
         let duplicate = false;
         for (const p of prev) {
-          if (p.name == image.name) {
+          if (p.name == file.name) {
             duplicate = true;
             break;
           }
         }
         if (!duplicate)
-          arr.push(image);
+          arr.push(file);
       }
       return arr;
     });
@@ -63,32 +64,32 @@ export default function ImageGrid({ images, setImages }) {
   return (
     <YStack style={styles.container}>
       <XStack justifyContent="space-between" alignItems="center">
-        <Text> Images </Text>
+        <Text> Files </Text>
         <XStack>
-          {selectedImages.length > 0 &&
+          {selectedFiles.length > 0 &&
             <Button
               transparent
               icon={<Trash color="red" scale={1.5} />}
-              onPress={removeSelectedImages}
+              onPress={removeSelectedFiles}
             />
           }
-          <Button transparent icon={<Plus scale={1.5} />} onPress={pickImages} />
+          <Button transparent icon={<Plus scale={1.5} />} onPress={pickFiles} />
         </XStack>
       </XStack>
 
       <ScrollView style={styles.gridContainer}>
         <XStack style={styles.grid}>
-          {images.map((item, index) => (
+          {files.map((item: Asset, index: number) => (
             <Pressable
               style={styles.gridItem}
               key={index}
-              onPress={() => toggleImageSelection(index)}
+              onPress={() => toggleFileSelection(index)}
             >
               <Image
                 style={
-                  selectedImages.includes(index)
-                    ? styles.selectedImage
-                    : styles.image
+                  selectedFiles.includes(index)
+                    ? styles.selectedFile
+                    : styles.file
                   }
                 source={{ uri: item.uri }}
               />
@@ -121,12 +122,12 @@ const styles = StyleSheet.create({
   gridItem: {
     width: "48%",
   },
-  image: {
+  file: {
     width: "100%",
     aspectRatio: 1,
     borderRadius: 10
   },
-  selectedImage: {
+  selectedFile: {
     transform: [{ scale: 0.95 }],
     aspectRatio: 1,
     borderRadius: 10,

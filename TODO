@@ -1,8 +1,8 @@
+- Use [markdown](https://github.com/Expensify/react-native-live-markdown)
+  Look into rendering latex for math notes
+- Ditch expo-image-picker and let the user select files from the filesystem instead
 - Implement card editing (flashcard flipping doesn't work anymore when practicing)
-- Put a random message in the homescreen
-- Install android studio and build a dev apk
 - Port frontend over to web (different logic depending on the platform)
-- Improve theme: going for a solarized vibe that's easy on the eyes and nice to stare at
 - Improve fonts: going for a calm yet playful vibe (headers should bolded, btw)
 - Improcw the styling of the auth page
 - Design logo and art

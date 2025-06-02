@@ -1,8 +1,12 @@
 import { useLocalSearchParams } from "expo-router";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
-import { Button, TextArea, Text, View, XStack, YStack } from "tamagui";
+import {
+  MarkdownTextInput, parseExpensiMark
+} from '@expensify/react-native-live-markdown';
+
+import { Button, Text, View, XStack, YStack } from "tamagui";
 import {
   ChevronLeft, ChevronRight, Rotate3d, Plus, Trash
 } from "@tamagui/lucide-icons";
@@ -13,17 +17,16 @@ import useStorage from "@/lib/storage";
 import Flashcard from "@/components/flashcard";
 import { Page, Header } from "@/components/page";
 
-export default function ViewDeck() {
-  const routeParams = useLocalSearchParams();
-  const index = Number(routeParams.index);
+export default function EditDeck() {
+  const { index } = useLocalSearchParams<{ index: string }>();
 
-  const [deck, setDeck] = useState<Deck | undefined>(undefined);
-  const [decks, _] = useStorage("decks", []);
+  const [decks, _setDecks] = useStorage<string[]>("decks", []);
+  const [deck, _setDeck] = useStorage<Deck>(decks[Number(index)], {
+    id: 0, name: "", cards: [{front: "", back: ""}]
+  });
 
   const [cardIndex, setCardIndex] = useState(0);
   const [showFront, setShowFront] = useState(true);
-
-  useEffect(() => { setDeck(decks[index]); }, []);
 
   // mod handles negative values as well
   const mod = (n: number, m: number) => ((n % m) + m) % m;
@@ -35,7 +38,7 @@ export default function ViewDeck() {
   }
 
   const editCard = (text: string, front: boolean) => {
-   setDeck((prev) => {
+   setDeck((prev: Deck) => {
      const newFront = front ? text : prev!.front;
      const newBack = !front ? text : prev!.back;
      return { ...prev, front: newFront, back: newBack };
@@ -58,14 +61,14 @@ export default function ViewDeck() {
           <Flashcard
             showFront={showFront} setShowFront={setShowFront}
             frontContent={
-              <TextArea
-                value={getCard(true)}
-                onChangeText={(text) => editCard(text.trim(), true)} />
+              <MarkdownTextInput
+                value={getCard(true)} parser={parseExpensiMark}
+                onChangeText={(text: string) => editCard(text.trim(), true)} />
             }
             backContent={
-              <TextArea
-                value={getCard(false)}
-                onChangeText={(text) => editCard(text.trim(), false)} />
+              <MarkdownTextInput
+                value={getCard(false)} parser={parseExpensiMark}
+                onChangeText={(text: string) => editCard(text.trim(), false)} />
             }
           />
 

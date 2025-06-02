@@ -6,24 +6,24 @@ import { StyleSheet } from "react-native";
 import { Button, Input, H4, Text, Spinner, XStack, YStack } from "tamagui";
 import { Redo } from "@tamagui/lucide-icons";
 
-import useStorage from "@/lib/storage";
-import { request, Asset, Deck, Flashcard } from "@/lib/helpers";
+import { storeObject, useStorage } from "@/lib/storage";
+import { request, Asset, Flashcard } from "@/lib/helpers";
 
 import { Page, Header } from "@/components/page";
-import ImagePicker from "@/components/imagePicker";
+import FilePicker from "@/components/filePicker";
 
 enum States { None, Generating, Error };
 
 export default function CreateDeck() {
   const [name, setName] = useState("");
   const [numCards, setNumCards] = useState(0);
-  const [images, setImages] = useState<Asset[]>([]);
+  const [files, setFiles] = useState<Asset[]>([]);
 
   const [errorMessage, setErrorMessage] = useState("");
   const [state, setState] = useState(States.None);
 
-  const [token, _] = useStorage("jwt", "");
-  const [decks, setDecks] = useStorage("decks", []);
+  const [token, _] = useStorage<string>("jwt", "");
+  const [decks, setDecks] = useStorage<string[]>("decks", []);
 
   const updateNumCards = (text: string) => {
     const num = Math.round(Number(text));
@@ -36,7 +36,7 @@ export default function CreateDeck() {
       return false;
     }
 
-    const same = decks.find((deck: Deck) => deck.name == name);
+    const same = decks.find(deckName => deckName == name);
     if (same !== undefined) {
         setErrorMessage("Deck already exists");
         return false;
@@ -47,8 +47,8 @@ export default function CreateDeck() {
       return false;
     }
 
-    if (images.length == 0) {
-      setErrorMessage("Must upload images");
+    if (files.length == 0) {
+      setErrorMessage("Must upload files");
       return false;
     }
 
@@ -78,23 +78,25 @@ export default function CreateDeck() {
     setState(States.Generating);
 
     try {
-      const batchSize = 5;
-      const numBatches = Math.ceil(images.length / batchSize);
+      const batchSize = 2;
+      const numBatches = Math.ceil(files.length / batchSize);
       let cards = [];
 
       for (let i = 0; i < numBatches; i++) {
-        const batch = images.slice(i * batchSize, i * batchSize + batchSize);
+        const batch = files.slice(i * batchSize, i * batchSize + batchSize);
         const set = await processBatch(batch);
         cards.push(...set);
       }
 
       const payload = { name, size: numCards, drafts: cards };
-      const response = await request("PUT", "/deck", payload, jwt);
+      const response = await request("PUT", "/deck", payload, token);
       const json = await response.json();
 
-      const len = decks.length;
-      setDecks((prev: Deck[]) => [...prev, json]);
-      router.push({pathname: "/viewDeck", params: {index: len}})
+      const prevlength = decks.length;
+      setDecks(prev => [...prev, json["name"]]);
+
+      await storeObject(json["name"], json);
+      router.push({pathname: "/viewDeck", params: {index: prevlength}})
     } catch (error) {
       console.log(error);
       setState(States.Error);
@@ -123,7 +125,7 @@ export default function CreateDeck() {
             </XStack>
           </YStack>
 
-          <ImagePicker setImages={setImages} images={images} />
+          <FilePicker setFiles={setFiles} files={files} />
 
           <Button themeInverse onPress={createDeck}>Create deck</Button>
         </YStack>

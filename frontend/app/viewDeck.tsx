@@ -8,36 +8,28 @@ import { Redo } from "@tamagui/lucide-icons";
 
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
+import { useStorage } from "@/lib/storage";
+import { Deck } from "@/lib/helpers";
+
 import Flashcard from "@/components/flashcard";
 import { Page, Header } from "@/components/page";
 
-import { Deck } from "@/lib/helpers";
-import useStorage from "@/lib/storage";
-
 export default function ViewDeck() {
-  const routeParams = useLocalSearchParams();
-  const index = Number(routeParams.index);
+  const { index } = useLocalSearchParams<{ index: string }>();
 
-  const [deck, setDeck] = useState<Deck | undefined>(undefined);
-  const [decks, setDecks] = useStorage("decks", []);
+  const [decks, _setDecks] = useStorage<string[]>("decks", []);
+  const [deck, _setDeck] = useStorage<Deck>(decks[Number(index)], {
+    id: 0, name: "", cards: [{front: "", back: ""}]
+  });
 
   const [cardIndex, setCardIndex] = useState(0);
   const [done, setDone] = useState(false);
   const [showFront, setShowFront] = useState(true);
 
-  useEffect(() => { setDeck(decks[index]); }, []);
-
-  const setConfidence = (value: number) => {
+  const setConfidence = (_value: number) => {
     // TODO: set the confidence for the card
     // ex: did you know the info on the card, or should we
     // keep showing you this card until you have it memorized?
-
-    setDecks((prev: Deck[]) => {
-      const copy = [...prev];
-      copy[index] = deck;
-      return copy;
-    });
-
     setShowFront(true);
     if (cardIndex + 1 < deck.cards.length)
       setCardIndex(cardIndex + 1);

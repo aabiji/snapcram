@@ -5,10 +5,11 @@
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@expensify/react-native-live-markdown": "^0.1.279",
@@ -27,10 +28,11 @@
     "expo-blur": "~14.1.4",
     "expo-constants": "~17.1.6",
     "expo-crypto": "~14.1.4",
+    "expo-dev-client": "~5.1.8",
+    "expo-document-picker": "~13.1.5",
     "expo-font": "~13.3.1",
     "expo-haptics": "~14.1.4",
     "expo-image": "~2.1.7",
-    "expo-image-picker": "^16.1.4",
     "expo-linear-gradient": "^14.1.4",
     "expo-linking": "~7.1.4",
     "expo-media-library": "^17.1.6",
@@ -49,16 +51,18 @@
     "react-native-safe-area-context": "5.4.0",
     "react-native-screens": "~4.10.0",
     "react-native-sha256": "^1.4.10",
+    "react-native-svg": "^15.12.0",
     "react-native-web": "~0.20.0",
     "react-native-webview": "13.13.5",
-    "tamagui": "^1.126.12",
-    "expo-dev-client": "~5.1.8"
+    "tamagui": "^1.126.12"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@types/react": "~19.0.10",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~9.2.0",
+    "patch-package": "^8.0.0",
+    "postinstall-postinstall": "^2.1.0",
     "typescript": "~5.8.3"
   },
   "private": true

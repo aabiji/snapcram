@@ -1,34 +1,38 @@
 {
   "expo": {
-    "name": "frontend",
+    "name": "Snapcram",
     "slug": "Snapcram",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/icons/icon.png",
     "scheme": "frontend",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.Snapcram"
     },
     "android": {
+      "icon": "./assets/icons/android/icon.png",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/icons/android/foreground.png",
+        "monochromeImage": "./assets/icons/android/monochrome.png",
+        "backgroundImage": "./assets/icons/android/background.png",
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.anonymous.Snapcram"
     },
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/icons/favicon.ico"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/icon.png",
+          "image": "./assets/icons/icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
@@ -37,7 +41,9 @@
       [
         "expo-font",
         {
-          "fonts": ["./assets/Lexend.ttf"]
+          "fonts": [
+            "./assets/Lexend.ttf"
+          ]
         }
       ]
     ],

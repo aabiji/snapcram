@@ -30,15 +30,21 @@ function PasswordInput({ setPassword, placeholder }) {
 }
 
 export default function AuthPage() {
+  const [_, setToken] = useStorage<string>("jwt", "");
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [repeatedPassword, setRepeatedPassword] = useState("");
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
   const [creatingAccount, setCreatingAccount] = useState(false);
 
-  const [_, setToken] = useStorage("jwt", "");
+  const toggleMode = () => {
+    setError("");
+    setCreatingAccount(!creatingAccount);
+  };
 
   const validateInputs = (): boolean => {
     const base = email.length > 0 && password.length > 0
@@ -87,7 +93,6 @@ export default function AuthPage() {
         password
       );
       const payload = { email, password: digest, existing: !creatingAccount };
-      console.log(payload);
 
       const response = await request("POST", "/authenticate", payload);
       const json = await response.json();
@@ -139,10 +144,7 @@ export default function AuthPage() {
             }
           </Button>
 
-          <Anchor
-            textAlign="right"
-            onPress={() => setCreatingAccount(!creatingAccount)}
-          >
+          <Anchor textAlign="right" onPress={toggleMode}>
             {creatingAccount ?  "I already have an account" : "I don't have an account"}
           </Anchor>
         </Card>

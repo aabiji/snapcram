@@ -54,9 +54,11 @@ func promptGroqLLM(payload Payload, apiKey string) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer response.Body.Close()
 
-	fmt.Println(response.StatusCode)
+	defer response.Body.Close()
+	if response.StatusCode == 413 {
+		return nil, fmt.Errorf("payload is too large")
+	}
 
 	responseBytes, err := io.ReadAll(response.Body)
 	if err != nil {
