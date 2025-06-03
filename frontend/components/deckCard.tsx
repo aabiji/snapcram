@@ -1,20 +1,20 @@
 import { router } from "expo-router";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Pressable } from "react-native";
 
 import { Button, Card, Text, XStack, YStack } from "tamagui";
 import { ChevronRight, ChevronDown, Pen, Repeat, Trash } from "@tamagui/lucide-icons";
 
 import { Deck, request } from "@/lib/helpers";
-import useStorage from "@/lib/storage";
+import { useObject, useStorage } from "@/lib/storage";
 
 export default function DeckCard(
   { name, index }: { name: string, index: number }) {
   const [token, _setToken] = useStorage<string>("jwt", "");
   const [showControls, setShowControls] = useState(false);
 
-  const [deck, _setDeck] = useStorage<Deck>(name, {
+  const [deck, _setDeck] = useObject<Deck>(name, {
     id: 0, name: "", cards: [{front: "", back: ""}]
   });
   const [_decks, setDecks] = useStorage<string[]>("decks", []);

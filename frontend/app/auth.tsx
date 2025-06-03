@@ -15,7 +15,7 @@ function PasswordInput({ setPassword, placeholder }) {
   return (
     <View flex={1} flexDirection="row" position="relative">
       <Input
-        flexGrow={1}
+        flexGrow={1} autoCapitalize="none"
         placeholder={placeholder} secureTextEntry={!visible}
         onChangeText={(text) => setPassword(text.trim())}>
       </Input>

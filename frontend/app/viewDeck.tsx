@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from "expo-router";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { StyleSheet } from "react-native";
 
 import { Button, H4, View, XStack, YStack } from "tamagui";
@@ -8,7 +8,7 @@ import { Redo } from "@tamagui/lucide-icons";
 
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
-import { useStorage } from "@/lib/storage";
+import { useObject, useStorage } from "@/lib/storage";
 import { Deck } from "@/lib/helpers";
 
 import Flashcard from "@/components/flashcard";
@@ -18,7 +18,7 @@ export default function ViewDeck() {
   const { index } = useLocalSearchParams<{ index: string }>();
 
   const [decks, _setDecks] = useStorage<string[]>("decks", []);
-  const [deck, _setDeck] = useStorage<Deck>(decks[Number(index)], {
+  const [deck, _setDeck] = useObject<Deck>(decks[Number(index)], {
     id: 0, name: "", cards: [{front: "", back: ""}]
   });
 
@@ -59,16 +59,18 @@ export default function ViewDeck() {
         }
 
         {!done &&
-          <View flex={1} justifyContent="center" alignItems="center">
-            <Flashcard
-              showFront={showFront} setShowFront={setShowFront}
-              frontContent={
-                <H4 textAlign="center">{deck.cards[cardIndex].front}</H4>
-              }
-              backContent={
-                <H4 textAlign="center">{deck.cards[cardIndex].back}</H4>
-              }
-            />
+          <View flex={1}>
+            <View height="90%" alignItems="center">
+              <Flashcard
+                showFront={showFront} setShowFront={setShowFront}
+                frontContent={
+                  <H4 textAlign="center">{deck.cards[cardIndex].front}</H4>
+                }
+                backContent={
+                  <H4 textAlign="center">{deck.cards[cardIndex].back}</H4>
+                }
+              />
+            </View>
 
             <XStack style={styles.controls}>
               <Button flex={1} borderRadius={0} backgroundColor="red"
@@ -101,5 +103,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     margin: 0,
     padding: 0,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

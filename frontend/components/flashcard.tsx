@@ -51,24 +51,27 @@ export default function Flashcard(
     position: "absolute", top: 0, left: 0, right: 0, bottom: 0
   };
 
-  const show = (front: boolean | undefined) => {
-    if (front !== undefined)
-      setShowFront!(!front);
-  };
+  const flip = () => {
+    if (setShowFront !== undefined && showFront !== undefined)
+      setShowFront(!showFront);
+  }
 
   return (
     <View style={styles.cardContainer}>
-      <Animated.View style={[styles.flashcard, frontAnimatedStyle]}>
-        <Card style={styles.card} bordered onPress={() => show(!showFront)}>
-          {frontContent}
-        </Card>
-      </Animated.View>
-
-      <Animated.View style={[styles.flashcard, backAnimatedStyle]}>
-        <Card style={styles.card} bordered onPress={() => show(!showFront)}>
-          {backContent}
-        </Card>
-      </Animated.View>
+      {
+        showFront
+          ?
+          <Animated.View style={[styles.flashcard, frontAnimatedStyle]}>
+            <Card style={styles.card} bordered onPress={flip}>
+              {frontContent}
+            </Card>
+          </Animated.View>
+          : <Animated.View style={[styles.flashcard, backAnimatedStyle]}>
+            <Card style={styles.card} bordered onPress={flip}>
+              {backContent}
+            </Card>
+          </Animated.View>
+      }
     </View>
   );
 }
@@ -78,7 +81,7 @@ const styles = StyleSheet.create({
     width: "95%",
     height: "75%",
     position: "relative",
-    marginTop: "-20%"
+    flex: 1
   },
   flashcard: {
     width: "100%",
@@ -86,7 +89,7 @@ const styles = StyleSheet.create({
   },
   card: {
     flex: 1,
-    backgroundColor: "$background",
+    backgroundColor: "$backgroundStrong",
     justifyContent: "center",
     alignItems: "center",
     backfaceVisibility: "hidden", // Don't see through the card

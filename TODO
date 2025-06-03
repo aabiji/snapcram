@@ -1,11 +1,8 @@
 - Use [markdown](https://github.com/Expensify/react-native-live-markdown)
   Look into rendering latex for math notes
-- Ditch expo-image-picker and let the user select files from the filesystem instead
-- Implement card editing (flashcard flipping doesn't work anymore when practicing)
 - Port frontend over to web (different logic depending on the platform)
 - Improve fonts: going for a calm yet playful vibe (headers should bolded, btw)
 - Improcw the styling of the auth page
-- Design logo and art
 - A spaced repetition algorithm to deliberately shows you cards
   you're less confident about more frequently
 - Also support pdfs, word files, powerpoint slides, audio recordings, etc
@@ -20,3 +17,4 @@
 - https://www.namecheap.com/domains/domain-name-search/
 - https://cloud.google.com/free/docs/free-cloud-features#free-tier
 - https://support.google.com/googleplay/android-developer/answer/6112435?hl=en#zippy=%2Cstep-accept-the-developer-distribution-agreement%2Cstep-pay-registration-fee%2Cstep-choose-a-developer-account-type%2Cstep-verify-your-developer-identity-information
+https://github.com/open-spaced-repetition/fsrs4anki/tree/main
