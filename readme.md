@@ -9,6 +9,10 @@ Tech stack:
 
 Run the frontend:
 ```bash
+# Install android studio
+sudo snap install android-studio # run through the default installation
+sudo apt install openjdk-17-jdk # install java
+
 cd path/to/snapcram/frontend
 npm install
 npx expo start
@@ -23,6 +27,8 @@ sudo docker compose up --build
 Before running the backend, you'll also need to create a .env in the project root that looks something like this:
 ```env
 DEBUG_MODE=1
+GMAIL_ADDRESS=<the business email>
+GMAIL_APP_PASSWORD=<Password you got from creating an app password here: https://myaccount.google.com/apppasswords>
 GROQ_API_KEY=<your api key>
 JWT_SECRET=<generate a secret key using this: https://jwtsecret.com/generate>
 

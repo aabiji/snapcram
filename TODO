@@ -1,20 +1,33 @@
-- Use [markdown](https://github.com/Expensify/react-native-live-markdown)
-  Look into rendering latex for math notes
-- Port frontend over to web (different logic depending on the platform)
-- Improve fonts: going for a calm yet playful vibe (headers should bolded, btw)
-- Improcw the styling of the auth page
-- A spaced repetition algorithm to deliberately shows you cards
-  you're less confident about more frequently
-- Also support pdfs, word files, powerpoint slides, audio recordings, etc
-- Make the model also optionally add diagrams and images to the flashcards
-- Do the flashcards work for math, for other subjects, etc?
-- Be able to export the flashcards to anki
-- Host the backend (and website) and publish to the play store
-- Find and load existing flashcard decks (not necessarily ai generated)
-- Extend the idea further and generate mock tests
-- Add logging to the backend
+- Say no more cards left message if the deck is empty
+- Save deck when leaving page
+- Regenerate deck with more assets
+- Implement a spaced repitition system
+  - Look at fsrs4anki and understand their implementation
+  - Adapt that implementation for our eeds
+- Port the frontend over to web
+- Authenticate users by emailing them a link instead of requiring a password
+  - Make the frontend support email use the value from the .env file in the root directory of the project
+- Improve the UI design
+  - Better theme
+  - Better icons
+  - Better fonts
+  - Add animations
+- Add logging
+  - Log each request and the different operations made, as well as any errors and the details surrounding them
+  - Write to a recoverable log file
+- Sometimes the grok api returns a 500 internal server error,
+  in that case we should retry our request instead of making it seem like we failed
+- Host the backend in the cloud and buy a domain name (at least 30$)
+- Publish the app on the play store (at least 25$)
 
-- https://www.namecheap.com/domains/domain-name-search/
-- https://cloud.google.com/free/docs/free-cloud-features#free-tier
-- https://support.google.com/googleplay/android-developer/answer/6112435?hl=en#zippy=%2Cstep-accept-the-developer-distribution-agreement%2Cstep-pay-registration-fee%2Cstep-choose-a-developer-account-type%2Cstep-verify-your-developer-identity-information
-https://github.com/open-spaced-repetition/fsrs4anki/tree/main
+Maybe?
+- Scrape flashcards from other sites and create a library of flashcards the user
+  can practice from and extend
+- Flashcards are defined in markdown, so let the user edit the markdown.
+  Already using [this](https://github.com/Expensify/react-native-live-markdown) library
+- Look into generating flashcards for math heavy subjects. Can we render latex nicely?
+- Look into allow the model to generate diagrams in the flashcards
+- Look into generating interactive Cloze deletion flashcards
+- Handle powerpoint slides, word documents, and pdfs
+- Allow users to export decks
+- Allow users to share their decks with other users

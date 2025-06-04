@@ -96,8 +96,8 @@ export default function Settings() {
   const { theme, toggleTheme } = useThemeContext();
 
   const openSupportEmail = () => {
-    const host = process.env.EXPO_PUBLIC_SUPPORT_EMAIL;
-    Linking.openURL(`mailto:${host}`);
+    const BUSINESS_EMAIL = "snapcram.business@gmail.com";
+    Linking.openURL(`mailto:${BUSINESS_EMAIL}`);
   }
 
   const deleteAccount = () => {
