@@ -1,10 +1,10 @@
-export async function request(
+export default async function request(
   method: string,
   endpoint: string,
   payload?: object | FormData,
   token?: string
 ): Promise<Response> {
-  const host = process.env.EXPO_PUBLIC_HOST_ADDRESS;
+  const host = process.env.EXPO_PUBLIC_DEBUG_HOST_ADDRESS;
   const url = `http://${host}:8080${endpoint}`;
 
   let headers: Record<string, string> = {};
@@ -23,9 +23,3 @@ export async function request(
     body: isForm ? payload : JSON.stringify(payload)
   });
 }
-
-export interface Flashcard { front: string; back: string; }
-
-export interface Deck { id: number; name: string; cards: Flashcard[]; }
-
-export interface Asset { uri: string; name: string; mimetype: string; }

@@ -10,11 +10,10 @@ export function useStorage<T>(key: string, defaultValue: T) {
   return useMMKVStorage<T>(key, storageInstance, defaultValue);
 }
 
-export const storeObject = async (key: string, value: any) =>
-  await storageInstance.setMapAsync(key, value); // value stored as string!
+export const storeObject = (key: string, value: any) =>
+  storageInstance.setMap(key, value); // value stored as string!
 
-export const getString = async (key: string) =>
-  await storageInstance.getStringAsync(key);
+export const getString = (key: string) => storageInstance.getString(key);
 
 // Custom hook to get the object as the specified type after
 // it was stored as a string in local storage

@@ -1,11 +1,12 @@
-import { useFocusEffect, router } from "expo-router";
+import { router } from "expo-router";
 
-import { useCallback, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { H4, Spinner, YStack } from "tamagui";
 
+import { Deck } from "@/lib/types";
 import { storeObject, useStorage } from "@/lib/storage";
-import { Deck, request } from "@/lib/helpers";
+import request from "@/lib/http";
 
 import { Page, MainHeader } from "@/components/page";
 import DeckCard from "@/components/deckCard";
@@ -37,7 +38,7 @@ export default function Index() {
       const names = [];
       for (let i = 0; i < json["decks"].length; i++) {
         const deck: Deck = json["decks"][i];
-        await storeObject(deck.name, deck);
+        storeObject(deck.name, deck);
         names.push(deck.name);
       }
       setDecks(names);
@@ -50,7 +51,7 @@ export default function Index() {
     }
   }
 
-  useFocusEffect(useCallback(() => { loadUserInfo(); }, []));
+  useEffect(() => { loadUserInfo(); }, []);
 
   if (loading) {
     return (

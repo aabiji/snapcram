@@ -7,7 +7,7 @@ import { Eye, EyeOff } from "@tamagui/lucide-icons";
 
 import Page from "@/components/page";
 
-import { request } from "@/lib/helpers";
+import request from "@/lib/http";
 import useStorage from "@/lib/storage";
 
 function PasswordInput({ setPassword, placeholder }) {

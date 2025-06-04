@@ -147,6 +147,25 @@ func (db *Database) insertDeck(userId string, deck Deck) (int, error) {
 	return deckId, err
 }
 
+func (db *Database) updateDeck(userId string, deck Deck) error {
+	tx, err := db.pool.Begin(context.Background())
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(context.Background())
+
+	// TODO: if card.Edited, then update, if card.Deleted, then remove, if card.Created then insert
+	for _, card := range deck.Cards {
+		str := "update Flashcards set Front = $1, Back = $2 where DeckID = $3"
+		_, err := tx.Exec(context.Background(), str, card.Front, card.Back, deck.ID)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit(context.Background())
+}
+
 func (db *Database) getFlashcards(deckId string) ([]Card, error) {
 	str := "select Front, Back from Flashcards where DeckID = $1"
 	rows, err := db.pool.Query(context.Background(), str, deckId)

@@ -294,6 +294,35 @@ func (app *App) DeleteDeck(ctx *gin.Context) {
 	handleResponse(ctx, http.StatusOK, nil)
 }
 
+// TODO: use EditedCard instead of Card
+type EditDeckData struct {
+	ID       int    `json:"id" binding:"required"`
+	NewCards []Card `json:"edited" binding:"required"`
+}
+
+// Create a flashcard deck using previously generated flashcard drafts
+func (app *App) EditDeck(ctx *gin.Context) {
+	userId, err := app.getUserID(ctx)
+	if err != nil {
+		handleResponse(ctx, http.StatusBadRequest, "Authentication required")
+		return
+	}
+
+	var data EditDeckData
+	if err := ctx.ShouldBindJSON(&data); err != nil {
+		handleResponse(ctx, http.StatusBadRequest, nil)
+		return
+	}
+
+	err = app.db.updateDeck(userId, Deck{ID: data.ID, Cards: data.NewCards})
+	if err != nil {
+		handleResponse(ctx, http.StatusInternalServerError, nil)
+		return
+	}
+
+	handleResponse(ctx, http.StatusOK, nil)
+}
+
 func main() {
 	app, err := NewApp()
 	if err != nil {
@@ -310,10 +339,13 @@ func main() {
 	server := gin.Default()
 	server.MaxMultipartMemory = app.fileUploadLimit()
 
-	server.GET("/userInfo", app.GetUserInfo)
 	server.POST("/authenticate", app.AuthenticateUser)
+	server.GET("/userInfo", app.GetUserInfo)
+
 	server.POST("/generate", app.GenerateFlashcards)
-	server.PUT("/deck", app.CreateDeck)
+
+	server.POST("/deck", app.CreateDeck)
+	server.PATCH("/deck", app.EditDeck)
 	server.DELETE("/deck", app.DeleteDeck)
 
 	if err := server.Run(); err != nil {

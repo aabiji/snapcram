@@ -8,8 +8,8 @@ import { Redo } from "@tamagui/lucide-icons";
 
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
+import { Deck } from "@/lib/types";
 import { useObject, useStorage } from "@/lib/storage";
-import { Deck } from "@/lib/helpers";
 
 import Flashcard from "@/components/flashcard";
 import { Page, Header } from "@/components/page";

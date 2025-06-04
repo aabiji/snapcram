@@ -6,8 +6,9 @@ import { StyleSheet } from "react-native";
 import { Button, Input, H4, Text, Spinner, XStack, YStack } from "tamagui";
 import { Redo } from "@tamagui/lucide-icons";
 
+import { Asset, Flashcard  } from "@/lib/types";
+import request from "@/lib/http";
 import { storeObject, useStorage } from "@/lib/storage";
-import { request, Asset, Flashcard } from "@/lib/helpers";
 
 import { Page, Header } from "@/components/page";
 import FilePicker from "@/components/filePicker";
@@ -89,7 +90,7 @@ export default function CreateDeck() {
       }
 
       const payload = { name, size: numCards, drafts: cards };
-      const response = await request("PUT", "/deck", payload, token);
+      const response = await request("POST", "/deck", payload, token);
       const json = await response.json();
 
       const prevlength = decks.length;

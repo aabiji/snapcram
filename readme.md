@@ -7,24 +7,9 @@ Tech stack:
 - Frontend: React native with tamagui
 - Backend: Golang, sqlite, Groq api
 
-Run the frontend:
-```bash
-# Install android studio
-sudo snap install android-studio # run through the default installation
-sudo apt install openjdk-17-jdk # install java
-
-cd path/to/snapcram/frontend
-npm install
-npx expo start
-```
-
-Run the backend
-```bash
-cd path/to/snapcram/backend
-sudo docker compose up --build
-```
-
-Before running the backend, you'll also need to create a .env in the project root that looks something like this:
+### Building
+Before running the app, you'll need to create 2 .env files.
+One in the root directory of the project:
 ```env
 DEBUG_MODE=1
 GMAIL_ADDRESS=<the business email>
@@ -36,4 +21,23 @@ PGUSER=postgres
 POSTGRES_DB=<what you want to call the database>
 POSTGRES_PASSWORD=<super secret database password!>
 DATABASE_URL=postgresql://<PGUSER>:<POSTGRES_PASSWORD>@db:5432/<POSTGRES_DB>
+```
+
+One in frontend/
+```env
+EXPO_PUBLIC_DEBUG_HOST_ADDRESS=<your computer's ip address>
+EXPO_PUBLIC_SUPPORT_EMAIL=<same email address as before>
+```
+
+Run the frontend: Note: you'll need Java 17 and Android Studio installed.
+```bash
+cd path/to/snapcram/frontend
+npm install
+npx expo run android
+```
+
+Run the backend:
+```bash
+cd path/to/snapcram/backend
+sudo docker compose up
 ```

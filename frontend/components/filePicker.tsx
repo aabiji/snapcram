@@ -6,7 +6,7 @@ import { Pressable, ScrollView, StyleSheet } from "react-native";
 import { Button, Image, Text, XStack, YStack } from "tamagui";
 import { Plus, Trash } from "@tamagui/lucide-icons";
 
-import { Asset } from "@/lib/helpers";
+import { Asset } from "@/lib/http";
 
 export default function FilePicker({ files, setFiles }) {
   const [selectedFiles, setSelectedFiles] = useState<number[]>([]);

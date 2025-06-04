@@ -6,7 +6,8 @@ import { Pressable } from "react-native";
 import { Button, Card, Text, XStack, YStack } from "tamagui";
 import { ChevronRight, ChevronDown, Pen, Repeat, Trash } from "@tamagui/lucide-icons";
 
-import { Deck, request } from "@/lib/helpers";
+import { Deck } from "@/lib/types";
+import request from "@/lib/http";
 import { useObject, useStorage } from "@/lib/storage";
 
 export default function DeckCard(
