@@ -140,11 +140,15 @@ export default function EditDeck() {
       if (response.status != 200) {
         console.log("TODO: tell the user something went wrong!", json);
       } else {
-        console.log("success!");
-        // TODO: remove the fields that show they were edited:
-        // remove items that are marked as deleted, remove
-        // the edited and created fields otherwise
-        storeObject(deck.name, deck);
+        const finalized =
+          deck.cards
+            .filter(card => card.deleted === undefined)
+            .map((card) => {
+              delete card.edited;
+              delete card.created;
+              return card;
+            });
+        storeObject(deck.name, { ...deck, cards: finalized });
       }
     } catch (error) {
       console.log("TODO: tell the user something went wrong!", error);
