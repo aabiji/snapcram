@@ -1,6 +1,6 @@
 import { useFocusEffect, useLocalSearchParams } from "expo-router";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { StyleSheet } from "react-native";
 
 import {
@@ -13,6 +13,7 @@ import {
 } from "@tamagui/lucide-icons";
 
 import { Deck } from "@/lib/types";
+import request from "@/lib/http";
 import { getString, storeObject, useStorage } from "@/lib/storage";
 
 import Flashcard from "@/components/flashcard";
@@ -22,6 +23,7 @@ export default function EditDeck() {
   const { index } = useLocalSearchParams<{ index: string }>();
 
   const [decks, _setDecks] = useStorage<string[]>("decks", []);
+  const [token, _setToken] = useStorage<string>("jwt", "");
   const [deck, setDeck] = useState<Deck>({
     id: 0, name: "", cards: [
       {
@@ -33,51 +35,46 @@ export default function EditDeck() {
 
   const [cardIndex, setCardIndex] = useState(0);
   const [showFront, setShowFront] = useState(true);
-  const [leftDisabled, setLeftDisabled] = useState(false);
+  const [leftDisabled, setLeftDisabled] = useState(true);
   const [rightDisabled, setRightDisabled] = useState(false);
-
-  const currentCard = (front: boolean) =>
-    front ? deck.cards[cardIndex].front : deck.cards[cardIndex].back;
-
-  // TODO: figure out how to manage the actual card index and the
-  //       card index we show to the user. they're different since
-  //       we still include deleted flashcards!
 
   // Get the card index and the number of cards. Since cards that
   // are marked as deleted are intersperced with the others cards,
   // they'll be ignored
   const getProgress = () => {
-    console.log(cardIndex);
-
-    const before = deck.cards.slice(0, cardIndex).findIndex(d => d.deleted === undefined);
-    const after = deck.cards.slice(0, cardIndex - 1).findIndex(d => d.deleted === undefined);
-    const i = before != -1 ? before : after;
+    // The number of cards before the current one that aren't deleted
+    const i = deck.cards
+      .slice(0, cardIndex + 1)
+      .filter(d => d.deleted === undefined)
+      .length;
 
     const amount = deck.cards.filter(d => d.deleted === undefined).length;
-    return `${i + 1} / ${amount}`;
+    return `${i} / ${amount}`;
   }
 
   const nextCardIndex = (forward: boolean) => {
     // first card before the current card that's not deleted
-    const before =
+    let before =
       deck.cards.slice(0, cardIndex).findLastIndex(d => d.deleted === undefined);
+    if (before == -1) before = cardIndex;
 
     // first card after the current card that's not deleted
-    const after =
+    let after =
       deck.cards.findIndex((d, i) => i > cardIndex && d.deleted === undefined);
+    if (after == -1) after = deck.cards.length;
 
     return forward ? after : before;
   }
 
-  const changeCard = (forward: boolean) => {
+  const moveToNextCard = (forward: boolean) => {
     const next = nextCardIndex(forward);
-    setLeftDisabled(next < 0);
-    setRightDisabled(next >= deck.cards.length);
-    setCardIndex(
-      Math.min(Math.max(next, 0), deck.cards.length - 1)
-    );
+    setLeftDisabled(cardIndex == next);
+    setRightDisabled(next >= deck.cards.length - 1);
+    setCardIndex(Math.min(Math.max(next, 0), deck.cards.length - 1));
+    setShowFront(true);
   }
 
+  // TODO: don't allow the user to make duplicate cards
   const editCard = (text: string, front: boolean) => {
     if (text.trim().length == 0) return;
 
@@ -94,36 +91,64 @@ export default function EditDeck() {
     });
   }
 
-  const deleteCard = () => {
-    setDeck((prev: Deck) => {
-      const newCards = prev.cards.filter((_, i) => i != cardIndex);
-      return { ...prev, cards: newCards };
-    });
-    setCardIndex(i => i > 0 ? i - 1 : i);
-
-    setDeck((prev: Deck) => {
-      // Mark the current card as deleted
-      const before = prev.cards.slice(0, cardIndex);
-      const after = prev.cards.slice(cardIndex + 1);
-      const n = { ...prev.cards[cardIndex], deleted: true };
-      return { ...prev, cards: [...before, n, ...after] };
-    });
-  }
-
   const insertCard = () => {
-    // Insert a new card and mark it as created
+    const last = cardIndex == deck.cards.length - 1;
     setDeck((prev: Deck) => {
-      const before = prev.cards.slice(0, cardIndex + 1);
-      const after = prev.cards.slice(cardIndex);
-      const n = { front: "", back: "", created: true };
-      return { ...prev, cards: [...before, n, ...after] };
-    });
-    changeCard(true);
+      const cards = [
+        ...prev.cards.slice(0, cardIndex + 1),
+        { front: "", back: "", created: true },
+        ...prev.cards.slice(cardIndex + 1)
+      ];
+      return {...prev, cards};
+    })
+
+    if (last)
+      // Edge case: the user's appending to the deck
+      setCardIndex(deck.cards.length)
+    else
+      moveToNextCard(true);
   }
 
-  // TODO: send request to the backend
-  const saveEdits = () => {
-    //storeObject(deck.name, deck);
+  const removeCard = () => {
+    const firstValid = deck.cards.findIndex(d => d.deleted === undefined);
+    const first = cardIndex == firstValid;
+
+    setDeck((prev: Deck) => {
+      const cards = [
+        ...prev.cards.slice(0, cardIndex),
+        { ...prev.cards[cardIndex], deleted: true },
+        ...prev.cards.slice(cardIndex + 1)
+      ];
+      return { ...prev, cards };
+    });
+
+    if (first) {
+      // Edge case: the user's deleting the first card in the deck
+      moveToNextCard(true);
+      setLeftDisabled(true);
+    } else
+      moveToNextCard(false);
+  }
+
+  // TODO: test this out!
+  const saveEdits = async (d: Deck) => {
+    try {
+      const payload = { cards: d.cards, id: d.id };
+      const response = await request("PATCH", "/deck", payload, token);
+      const json = await response.json();
+
+      if (response.status != 200) {
+        console.log("TODO: tell the user something went wrong!", json);
+      } else {
+        console.log("success!");
+        // TODO: remove the fields that show they were edited:
+        // remove items that are marked as deleted, remove
+        // the edited and created fields otherwise
+        storeObject(deck.name, deck);
+      }
+    } catch (error) {
+      console.log("TODO: tell the user something went wrong!", error);
+    }
   }
 
   // Load the deck from local storage when the page loads
@@ -134,73 +159,85 @@ export default function EditDeck() {
         JSON.parse(data) as unknown as Deck
         : data as unknown as Deck;
     setDeck(val);
-  }, []);
+ }, []);
 
   // Save the edits when we leave the page
-  useFocusEffect(useCallback(() => saveEdits, [deck]));
+  const deckRef = useRef(deck);
+  useEffect(() => { deckRef.current = deck }, [deck]);
+  useFocusEffect(useCallback(() => () => saveEdits(deckRef.current), []));
 
   if (deck === undefined) return null;
 
   return (
     <Page header={<Header title={`Editing ${deck.name}`} />}>
       {deck.cards.length > 0 ?
-        <View flex={1}>
           <View flex={1} justifyContent="center" alignItems="center">
             <Flashcard
-              showFront={showFront}
+              showFront={showFront} key={cardIndex}
               frontContent={
-                <MarkdownTextInput style={styles.textbox} multiline={true}
-                  value={currentCard(true)} parser={parseExpensiMark}
+                <MarkdownTextInput
+                  placeholder="Front of the card"
+                  style={styles.textbox} multiline={true}
+                  value={deck.cards[cardIndex].front} parser={parseExpensiMark}
                   onChangeText={(text: string) => editCard(text, true)} />
               }
               backContent={
-                <MarkdownTextInput style={styles.textbox} multiline={true}
-                  value={currentCard(false)} parser={parseExpensiMark}
+                <MarkdownTextInput
+                  placeholder="Back of the card"
+                  style={styles.textbox} multiline={true}
+                  value={deck.cards[cardIndex].back} parser={parseExpensiMark}
                   onChangeText={(text: string) => editCard(text, false)} />
               }
             />
           </View>
+      :
+        <View flex={1} justifyContent="center" alignItems="center">
+          <H4>This deck is empty</H4>
+        </View>
+      }
 
-          <YStack width="100%" alignSelf="flex-end" gap={10}>
-            <XStack alignItems="center">
+      <YStack width="100%" alignSelf="flex-end" gap={10}>
+        <XStack alignItems="center">
+          {deck.cards.length > 0 &&
+            <View flex={1} flexDirection="row" alignItems="center">
               <Button
                 flex={1} borderRadius={0} transparent
                 icon={<Trash color="red" scale={2} />}
-                onPress={deleteCard}
+                onPress={removeCard}
               />
               <Text fontWeight="bold">{getProgress()}</Text>
-              <Button
-                flex={1} borderRadius={0} transparent
-                icon={<Plus color="blue" scale={2} />}
-                onPress={insertCard}
-              />
-            </XStack>
+            </View>
+          }
+          <Button
+            flex={1} borderRadius={0} transparent
+            icon={<Plus color="blue" scale={2} />}
+            onPress={insertCard}
+          />
+        </XStack>
 
-            <XStack>
-              <Button
-                flex={1} borderRadius={0} transparent
-                disabled={leftDisabled} onPress={() => changeCard(false)}
-                icon={
-                  <ChevronLeft color={leftDisabled ? "gray" : "black"} scale={2} />
-                }
-              />
-              <Button
-                flex={1} borderRadius={0} transparent
-                icon={<Rotate3d scale={1.5} />}
-                onPress={() => setShowFront(!showFront)} />
-              <Button
-                flex={1} borderRadius={0} transparent
-                disabled={rightDisabled} onPress={() => changeCard(true)}
-                icon={
-                  <ChevronRight color={rightDisabled ? "gray" : "black"} scale={2} />
-                }
-              />
-            </XStack>
-          </YStack>
-        </View>
-      :
-        <H4>This deck is empty. Create a new card?</H4>
-      }
+        {deck.cards.length > 0 &&
+          <XStack>
+            <Button
+              flex={1} borderRadius={0} transparent
+              disabled={leftDisabled} onPress={() => moveToNextCard(false)}
+              icon={
+                <ChevronLeft color={leftDisabled ? "gray" : "black"} scale={2} />
+              }
+            />
+            <Button
+              flex={1} borderRadius={0} transparent
+              icon={<Rotate3d scale={1.5} />}
+              onPress={() => setShowFront(!showFront)} />
+            <Button
+              flex={1} borderRadius={0} transparent
+              disabled={rightDisabled} onPress={() => moveToNextCard(true)}
+              icon={
+                <ChevronRight color={rightDisabled ? "gray" : "black"} scale={2} />
+              }
+            />
+          </XStack>
+        }
+      </YStack>
     </Page>
   );
 }

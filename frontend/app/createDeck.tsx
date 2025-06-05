@@ -96,7 +96,7 @@ export default function CreateDeck() {
       const prevlength = decks.length;
       setDecks(prev => [...prev, json["name"]]);
 
-      await storeObject(json["name"], json);
+      storeObject(json["name"], json);
       router.push({pathname: "/viewDeck", params: {index: prevlength}})
     } catch (error) {
       console.log(error);

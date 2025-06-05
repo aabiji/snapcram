@@ -14,6 +14,14 @@ type Card struct {
 	Back  string `json:"back"`
 }
 
+type EditedCard struct {
+	Front   string `json:"front"`
+	Back    string `json:"back"`
+	Edited  bool   `json:"edited"`
+	Created bool   `json:"created"`
+	Deleted bool   `json:"deleted"`
+}
+
 type Deck struct {
 	ID    int    `json:"id"`
 	Name  string `json:"name"`
@@ -147,17 +155,24 @@ func (db *Database) insertDeck(userId string, deck Deck) (int, error) {
 	return deckId, err
 }
 
-func (db *Database) updateDeck(userId string, deck Deck) error {
+func (db *Database) updateDeck(userId string, id int, cards []EditedCard) error {
 	tx, err := db.pool.Begin(context.Background())
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback(context.Background())
 
-	// TODO: if card.Edited, then update, if card.Deleted, then remove, if card.Created then insert
-	for _, card := range deck.Cards {
-		str := "update Flashcards set Front = $1, Back = $2 where DeckID = $3"
-		_, err := tx.Exec(context.Background(), str, card.Front, card.Back, deck.ID)
+	for _, card := range cards {
+		statement := ""
+		if card.Deleted {
+			statement = "delete from Flashcards where DeckID = $1 and Front = $2 and Back = $3;"
+		} else if card.Created {
+			statement = "insert into Flashcards (DeckId, Front, Back) values ($1, $2, $3);"
+		} else {
+			statement = "update Flashcards set Front = $2, Back = $3 where DeckID = $1;"
+		}
+
+		_, err := tx.Exec(context.Background(), statement, id, card.Front, card.Back)
 		if err != nil {
 			return err
 		}

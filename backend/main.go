@@ -294,13 +294,11 @@ func (app *App) DeleteDeck(ctx *gin.Context) {
 	handleResponse(ctx, http.StatusOK, nil)
 }
 
-// TODO: use EditedCard instead of Card
 type EditDeckData struct {
-	ID       int    `json:"id" binding:"required"`
-	NewCards []Card `json:"edited" binding:"required"`
+	ID    int          `json:"id" binding:"required"`
+	Cards []EditedCard `json:"cards" binding:"required"`
 }
 
-// Create a flashcard deck using previously generated flashcard drafts
 func (app *App) EditDeck(ctx *gin.Context) {
 	userId, err := app.getUserID(ctx)
 	if err != nil {
@@ -314,7 +312,7 @@ func (app *App) EditDeck(ctx *gin.Context) {
 		return
 	}
 
-	err = app.db.updateDeck(userId, Deck{ID: data.ID, Cards: data.NewCards})
+	err = app.db.updateDeck(userId, data.ID, data.Cards)
 	if err != nil {
 		handleResponse(ctx, http.StatusInternalServerError, nil)
 		return
