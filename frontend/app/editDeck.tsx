@@ -168,7 +168,16 @@ export default function EditDeck() {
   // Save the edits when we leave the page
   const deckRef = useRef(deck);
   useEffect(() => { deckRef.current = deck }, [deck]);
-  useFocusEffect(useCallback(() => () => saveEdits(deckRef.current), []));
+  useFocusEffect(useCallback(() => {
+    const data = getString(decks[Number(index)]);
+    const val =
+      typeof data === "string" ?
+        JSON.parse(data) as unknown as Deck
+        : data as unknown as Deck;
+    setDeck(val);
+
+    return () => saveEdits(deckRef.current);
+  }, []));
 
   if (deck === undefined) return null;
 
