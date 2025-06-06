@@ -76,14 +76,12 @@ export default function EditDeck() {
 
   // TODO: don't allow the user to make duplicate cards
   const editCard = (text: string, front: boolean) => {
-    if (text.trim().length == 0) return;
-
     setDeck((prev) => {
-      const newCards = prev.cards.map((card, idx) => {
-        if (idx !== cardIndex) return card;
+      const newCards = prev.cards.map((card, i) => {
+        if (i !== cardIndex) return card;
         return {
           ...card,
-          ...(front ? { front: text.trim() } : { back: text.trim() }),
+          ...(front ? { front: text } : { back: text }),
           edited: true
         };
       });
@@ -130,44 +128,29 @@ export default function EditDeck() {
       moveToNextCard(false);
   }
 
-  // TODO: test this out!
   const saveEdits = async (d: Deck) => {
     try {
       const payload = { cards: d.cards, id: d.id };
       const response = await request("PATCH", "/deck", payload, token);
       const json = await response.json();
 
-      if (response.status != 200) {
-        console.log("TODO: tell the user something went wrong!", json);
+      if (response.status == 200) {
+        storeObject(deck.name, { ...deck, cards: json["cards"] });
       } else {
-        const finalized =
-          deck.cards
-            .filter(card => card.deleted === undefined)
-            .map((card) => {
-              delete card.edited;
-              delete card.created;
-              return card;
-            });
-        storeObject(deck.name, { ...deck, cards: finalized });
+        console.log("TODO: tell the user something went wrong!", json);
       }
     } catch (error) {
       console.log("TODO: tell the user something went wrong!", error);
     }
   }
 
-  // Load the deck from local storage when the page loads
-  useEffect(() => {
-    const data = getString(decks[Number(index)]);
-    const val =
-      typeof data === "string" ?
-        JSON.parse(data) as unknown as Deck
-        : data as unknown as Deck;
-    setDeck(val);
- }, []);
-
   // Save the edits when we leave the page
   const deckRef = useRef(deck);
   useEffect(() => { deckRef.current = deck }, [deck]);
+  useFocusEffect(useCallback(() => () => saveEdits(deckRef.current), []));
+
+  // Load the deck from local storage when the page loads
+  // TODO: the state doesn't update when we navgiate back to the page after successfully editing!
   useFocusEffect(useCallback(() => {
     const data = getString(decks[Number(index)]);
     const val =
@@ -175,9 +158,7 @@ export default function EditDeck() {
         JSON.parse(data) as unknown as Deck
         : data as unknown as Deck;
     setDeck(val);
-
-    return () => saveEdits(deckRef.current);
-  }, []));
+  }, [index]));
 
   if (deck === undefined) return null;
 
@@ -212,14 +193,14 @@ export default function EditDeck() {
       <YStack width="100%" alignSelf="flex-end" gap={10}>
         <XStack alignItems="center">
           {deck.cards.length > 0 &&
-            <View flex={1} flexDirection="row" alignItems="center">
-              <Button
-                flex={1} borderRadius={0} transparent
-                icon={<Trash color="red" scale={2} />}
-                onPress={removeCard}
-              />
-              <Text fontWeight="bold">{getProgress()}</Text>
-            </View>
+            <Button
+              flex={1} borderRadius={0} transparent
+              icon={<Trash color="red" scale={2} />}
+              onPress={removeCard}
+            />
+          }
+          {deck.cards.length > 0 &&
+            <Text fontWeight="bold">{getProgress()}</Text>
           }
           <Button
             flex={1} borderRadius={0} transparent

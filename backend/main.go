@@ -312,13 +312,14 @@ func (app *App) EditDeck(ctx *gin.Context) {
 		return
 	}
 
-	err = app.db.updateDeck(userId, data.ID, data.Cards)
+	newCards, err := app.db.updateDeck(userId, data.ID, data.Cards)
 	if err != nil {
 		handleResponse(ctx, http.StatusInternalServerError, nil)
 		return
 	}
 
-	handleResponse(ctx, http.StatusOK, nil)
+	response := map[string]any{"cards": newCards}
+	handleResponse(ctx, http.StatusOK, response)
 }
 
 func main() {

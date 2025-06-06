@@ -10,6 +10,7 @@ export interface Flashcard {
 }
 
 export interface EditedFlashcard {
+    id: number;
     front: string;
     back: string;
     edited: boolean | undefined;
