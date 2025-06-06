@@ -1,32 +1,15 @@
-import { MMKVLoader, useMMKVStorage, ProcessingModes } from "react-native-mmkv-storage";
+import { MMKV, useMMKVObject, useMMKVString } from 'react-native-mmkv'
 
-const storageInstance = new MMKVLoader()
-  .withEncryption()
-  .setProcessingMode(ProcessingModes.SINGLE_PROCESS)
-  .initialize();
+export const storage = new MMKV({id: "storage", encryptionKey: "hunter2"});
 
-// Get/Store the object in local storage as the specified type
-export function useStorage<T>(key: string, defaultValue: T) {
-  return useMMKVStorage<T>(key, storageInstance, defaultValue);
+export const useStringStorage = (key: string, defaultValue: any) => {
+    const [value, setValue] = useMMKVString(key, storage);
+    return [value ?? defaultValue, setValue];
 }
 
-export const storeObject = (key: string, value: any) =>
-  storageInstance.setMap(key, value); // value stored as string!
-
-export const getString = (key: string) => storageInstance.getString(key);
-
-// Custom hook to get the object as the specified type after
-// it was stored as a string in local storage
-export function useObject<T>(key: string, defaultValue: T) {
-  const [raw, setRaw] = useMMKVStorage<string | null>(key, storageInstance, null);
-  const value = raw ? (typeof raw === "string" ? JSON.parse(raw) as T : raw) : defaultValue;
-
-  const setValue = (val: T | ((prev: T) => T)) => {
-    const newVal = typeof val === "function" ? (val as (prev: T) => T)(value) : val;
-    setRaw(JSON.stringify(newVal));
-  };
-
-  return [value, setValue];
+export const useStorage = (key: string, defaultValue: any) => {
+    const [value, setValue] = useMMKVObject(key, storage);
+    return [value ?? defaultValue, setValue];
 }
 
-export default useStorage;
+export default storage;

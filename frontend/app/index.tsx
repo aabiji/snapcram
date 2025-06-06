@@ -1,26 +1,28 @@
-import { router } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 import { H4, Spinner, YStack } from "tamagui";
 
 import { Deck } from "@/lib/types";
-import { storeObject, useStorage } from "@/lib/storage";
+import { storage, useStringStorage, useStorage } from "@/lib/storage";
 import request from "@/lib/http";
 
 import { Page, MainHeader } from "@/components/page";
 import DeckCard from "@/components/deckCard";
 
 export default function Index() {
-  const [decks, setDecks] = useStorage<string[]>("decks", []);
-  const [token, _setToken] = useStorage<string>("jwt", "");
+  const router = useRouter();
+
+  const [token, _setToken] = useStringStorage("jwt", "");
+  const [decks, setDecks] = useStorage("decks", []);
   const [loading, setLoading] = useState<boolean>(true);
 
   const loadUserInfo = async () => {
     // User hasn't authenticated before
     if (token === undefined || token.length == 0) {
-      router.replace("/auth");
       setLoading(false);
+      router.replace("/auth");
       return;
     }
 
@@ -29,8 +31,8 @@ export default function Index() {
       const json = await response.json();
 
       if (response.status != 200 || json["tokenExpired"] == true) {
-        router.replace("/auth");
         setLoading(false);
+        router.replace("/auth");
         return;
       }
 
@@ -38,7 +40,7 @@ export default function Index() {
       const names = [];
       for (let i = 0; i < json["decks"].length; i++) {
         const deck: Deck = json["decks"][i];
-        storeObject(deck.name, deck);
+        storage.set(deck.name, JSON.stringify(deck));
         names.push(deck.name);
       }
       setDecks(names);
@@ -46,12 +48,12 @@ export default function Index() {
       setLoading(false);
     } catch (error) {
       console.log(error);
-      router.replace("/networkIssue");
       setLoading(false);
+      router.replace("/networkIssue");
     }
   }
 
-  useEffect(() => { loadUserInfo(); }, []);
+  useFocusEffect(useCallback(() => { loadUserInfo(); }, []));
 
   if (loading) {
     return (

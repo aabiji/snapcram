@@ -8,17 +8,17 @@ import { ChevronRight, ChevronDown, Pen, Repeat, Trash } from "@tamagui/lucide-i
 
 import { Deck } from "@/lib/types";
 import request from "@/lib/http";
-import { useObject, useStorage } from "@/lib/storage";
+import { useStringStorage, useStorage } from "@/lib/storage";
 
 export default function DeckCard(
   { name, index }: { name: string, index: number }) {
-  const [token, _setToken] = useStorage<string>("jwt", "");
+  const [token, _setToken] = useStringStorage("jwt", "");
   const [showControls, setShowControls] = useState(false);
 
-  const [deck, _setDeck] = useObject<Deck>(name, {
+  const [deck, _setDeck] = useStorage(name, {
     id: 0, name: "", cards: [{front: "", back: ""}]
   });
-  const [_decks, setDecks] = useStorage<string[]>("decks", []);
+  const [_decks, setDecks] = useStorage("decks", []);
 
   const deleteSelf = async () => {
     try {

@@ -8,7 +8,7 @@ import { Redo } from "@tamagui/lucide-icons";
 
 import { Asset, Flashcard  } from "@/lib/types";
 import request from "@/lib/http";
-import { storeObject, useStorage } from "@/lib/storage";
+import { storage, useStringStorage, useStorage } from "@/lib/storage";
 
 import { Page, Header } from "@/components/page";
 import FilePicker from "@/components/filePicker";
@@ -23,8 +23,8 @@ export default function CreateDeck() {
   const [errorMessage, setErrorMessage] = useState("");
   const [state, setState] = useState(States.None);
 
-  const [token, _] = useStorage<string>("jwt", "");
-  const [decks, setDecks] = useStorage<string[]>("decks", []);
+  const [token, _] = useStringStorage("jwt", "");
+  const [decks, setDecks] = useStorage("decks", []);
 
   const updateNumCards = (text: string) => {
     const num = Math.round(Number(text));
@@ -96,7 +96,7 @@ export default function CreateDeck() {
       const prevlength = decks.length;
       setDecks(prev => [...prev, json["name"]]);
 
-      storeObject(json["name"], json);
+      storage.set(json["name"], JSON.stringify(json));
       router.push({pathname: "/viewDeck", params: {index: prevlength}})
     } catch (error) {
       console.log(error);

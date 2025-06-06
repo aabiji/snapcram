@@ -1,7 +1,7 @@
 import React, { createContext, useContext } from 'react';
 import { useColorScheme } from 'react-native';
 
-import useStorage from "@/lib/storage";
+import { useStringStorage } from "@/lib/storage";
 
 interface ThemeContextType {
   theme: 'light' | 'dark';
@@ -15,8 +15,7 @@ const ThemeContext = createContext<ThemeContextType>({
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const systemTheme = useColorScheme();
-  const [theme, setTheme] = useStorage<"light" | "dark">("theme", "light");
-  if (theme.length == 0) setTheme(systemTheme || "light");
+  const [theme, setTheme] = useStringStorage("theme", systemTheme || "light");
 
   const toggleTheme = () => setTheme((prev: string) => prev === "light" ? "dark" : "light");
 

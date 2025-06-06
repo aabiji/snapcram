@@ -8,9 +8,12 @@ import { Eye, EyeOff } from "@tamagui/lucide-icons";
 import Page from "@/components/page";
 
 import request from "@/lib/http";
-import useStorage from "@/lib/storage";
+import { useStringStorage  } from "@/lib/storage";
 
-function PasswordInput({ setPassword, placeholder }) {
+function PasswordInput(
+  { setPassword, placeholder }:
+  { placeholder: string, setPassword: (str: string) => void }
+) {
   const [visible, setVisible] = useState(false);
   return (
     <View flex={1} flexDirection="row" position="relative">
@@ -30,7 +33,7 @@ function PasswordInput({ setPassword, placeholder }) {
 }
 
 export default function AuthPage() {
-  const [_, setToken] = useStorage<string>("jwt", "");
+  const [_, setToken] = useStringStorage("jwt", "");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

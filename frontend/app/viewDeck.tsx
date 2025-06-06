@@ -8,8 +8,7 @@ import { Redo } from "@tamagui/lucide-icons";
 
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
-import { Deck } from "@/lib/types";
-import { useObject, useStorage } from "@/lib/storage";
+import { useStorage } from "@/lib/storage";
 
 import Flashcard from "@/components/flashcard";
 import { Page, Header } from "@/components/page";
@@ -17,8 +16,8 @@ import { Page, Header } from "@/components/page";
 export default function ViewDeck() {
   const { index } = useLocalSearchParams<{ index: string }>();
 
-  const [decks, _setDecks] = useStorage<string[]>("decks", []);
-  const [deck, _setDeck] = useObject<Deck>(decks[Number(index)], {
+  const [decks, _setDecks] = useStorage("decks", []);
+  const [deck, _setDeck] = useStorage(decks[Number(index)], {
     id: 0, name: "", cards: [{front: "", back: ""}]
   });
 

@@ -14,7 +14,7 @@ import {
 
 import { Deck } from "@/lib/types";
 import request from "@/lib/http";
-import { getString, storeObject, useStorage } from "@/lib/storage";
+import { storage, useStringStorage, useStorage } from "@/lib/storage";
 
 import Flashcard from "@/components/flashcard";
 import { Page, Header } from "@/components/page";
@@ -22,8 +22,8 @@ import { Page, Header } from "@/components/page";
 export default function EditDeck() {
   const { index } = useLocalSearchParams<{ index: string }>();
 
-  const [decks, _setDecks] = useStorage<string[]>("decks", []);
-  const [token, _setToken] = useStorage<string>("jwt", "");
+  const [decks, _setDecks] = useStorage("decks", []);
+  const [token, _setToken] = useStringStorage("jwt", "");
   const [deck, setDeck] = useState<Deck>({
     id: 0, name: "", cards: [
       {
@@ -135,7 +135,7 @@ export default function EditDeck() {
       const json = await response.json();
 
       if (response.status == 200) {
-        storeObject(deck.name, { ...deck, cards: json["cards"] });
+        storage.set(deck.name, { ...deck, cards: json["cards"] });
       } else {
         console.log("TODO: tell the user something went wrong!", json);
       }
@@ -152,11 +152,9 @@ export default function EditDeck() {
   // Load the deck from local storage when the page loads
   // TODO: the state doesn't update when we navgiate back to the page after successfully editing!
   useFocusEffect(useCallback(() => {
-    const data = getString(decks[Number(index)]);
-    const val =
-      typeof data === "string" ?
-        JSON.parse(data) as unknown as Deck
-        : data as unknown as Deck;
+    const val = JSON.parse(
+      storage.getString(decks[Number(index)])!
+    );
     setDeck(val);
   }, [index]));
 
