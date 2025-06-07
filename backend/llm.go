@@ -113,7 +113,7 @@ func createFlashcardDrafts(
 	// Create the request payload
 	NumCards := len(files) * 10 // generate 10 flashcards per assets
 	promptContent, err := parseTemplate(
-		"prompts/batch.template",
+		"templates/batch-prompt.template",
 		struct{ NumCards int }{NumCards},
 	)
 	if err != nil {
@@ -176,7 +176,7 @@ func createFlashcardDeck(
 		DeckSize: deckSize,
 		Cards:    drafts,
 	}
-	promptContent, err := parseTemplate("prompts/combine.template", t)
+	promptContent, err := parseTemplate("templates/combine-prompt.template", t)
 	if err != nil {
 		return nil, err
 	}

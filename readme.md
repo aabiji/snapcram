@@ -27,6 +27,7 @@ One in frontend/
 ```env
 EXPO_PUBLIC_DEBUG_HOST_ADDRESS=<your computer's ip address>
 EXPO_PUBLIC_SUPPORT_EMAIL=<same email address as before>
+EXPO_PUBLIC_ENCRYPTION_KEY=<some 256 bit secret key>
 ```
 
 Run the frontend: Note: you'll need Java 17 and Android Studio installed.

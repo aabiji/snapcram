@@ -112,6 +112,23 @@ type AuthUserData struct {
 	ExistingAccount *bool  `json:"existing" binding:"required"`
 }
 
+func (app *App) emailUser(recipient, authLink string) error {
+	data := struct{ Link string }{Link: authLink}
+	content, err := parseTemplate("templates/email.template", data)
+	if err != nil {
+		return err
+	}
+
+	info := EmailInfo{
+		recipient: recipient, content: content,
+		subject:  "Snapcram email authentication",
+		sender:   app.secrets["GMAIL_ADDRESS"],
+		username: app.secrets["GMAIL_ADDRESS"],
+		password: app.secrets["GMAIL_APP_PASSWORD"],
+	}
+	return sendEmail(info)
+}
+
 func (app *App) AuthenticateUser(ctx *gin.Context) {
 	var data AuthUserData
 	if err := ctx.ShouldBindJSON(&data); err != nil {
